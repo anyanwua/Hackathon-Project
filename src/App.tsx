@@ -1,5 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { calculateImpactScore, type Result } from './scoring'
+import { 
+  getUserData, 
+  saveUserData, 
+  addXP, 
+  updateStreak, 
+  updateLoginStreak, 
+  unlockBadge, 
+  checkBadgeConditions,
+  type UserData 
+} from './gamification'
+import { GamificationDashboard } from './components/GamificationDashboard'
+import { XPPopup } from './components/XPPopup'
+import { BadgeUnlock } from './components/BadgeUnlock'
+import { BadgesPage } from './components/BadgesPage'
 
 interface FormData {
   sleepHours: number
@@ -7,6 +21,11 @@ interface FormData {
   screenTimeHours: number
   exerciseMinutes: number
   moodLevel: number
+}
+
+interface XPGain {
+  amount: number
+  reason: string
 }
 
 function App() {
@@ -20,6 +39,25 @@ function App() {
   const [result, setResult] = useState<Result | null>(null)
   const [simulatedSleepHours, setSimulatedSleepHours] = useState<number>(8)
   const [isAnalysisOpen, setIsAnalysisOpen] = useState(false)
+  const [userData, setUserData] = useState<UserData>(getUserData())
+  const [xpGain, setXPGain] = useState<XPGain | null>(null)
+  const [badgeUnlock, setBadgeUnlock] = useState<string | null>(null)
+  const [showBadgesPage, setShowBadgesPage] = useState(false)
+  const [levelUp, setLevelUp] = useState<number | null>(null)
+
+  // Initialize user data and check login streak on mount
+  useEffect(() => {
+    const initialData = getUserData()
+    const loginUpdate = updateLoginStreak(initialData)
+    setUserData(loginUpdate.newData)
+    if (loginUpdate.loginStreakXP > 0) {
+      const xpResult = addXP(loginUpdate.loginStreakXP, 'Daily Login', loginUpdate.newData)
+      setUserData(xpResult.newData)
+      if (xpResult.leveledUp && xpResult.newLevel) {
+        setLevelUp(xpResult.newLevel)
+      }
+    }
+  }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,6 +71,134 @@ function App() {
     setResult(calculatedResult)
     setSimulatedSleepHours(formData.sleepHours)
     setIsAnalysisOpen(true)
+
+    // Gamification logic
+    let currentUserData = { ...userData }
+    const xpGains: XPGain[] = []
+    let finalLevelUp: number | null = null
+
+    // Update login streak
+    const loginUpdate = updateLoginStreak(currentUserData)
+    currentUserData = loginUpdate.newData
+    if (loginUpdate.loginStreakXP > 0) {
+      const loginXPResult = addXP(loginUpdate.loginStreakXP, 'Daily Login', currentUserData)
+      currentUserData = loginXPResult.newData
+      xpGains.push({ amount: loginUpdate.loginStreakXP, reason: 'Daily Login' })
+      if (loginXPResult.leveledUp && loginXPResult.newLevel) {
+        finalLevelUp = loginXPResult.newLevel
+      }
+    }
+
+    // Update task completion streak
+    const streakUpdate = updateStreak(currentUserData)
+    currentUserData = streakUpdate.newData
+    if (streakUpdate.streakXP > 0) {
+      const streakXPResult = addXP(streakUpdate.streakXP, `${currentUserData.currentStreak}-Day Streak!`, currentUserData)
+      currentUserData = streakXPResult.newData
+      xpGains.push({ amount: streakUpdate.streakXP, reason: `${currentUserData.currentStreak}-Day Streak!` })
+      if (streakXPResult.leveledUp && streakXPResult.newLevel) {
+        finalLevelUp = streakXPResult.newLevel
+      }
+    }
+
+    // Mark daily tasks as completed
+    currentUserData.dailyTasksCompleted = true
+    saveUserData(currentUserData)
+
+    // Award XP for completing all daily inputs
+    const dailyTasksXP = addXP(10, 'Daily Tasks Completed', currentUserData)
+    currentUserData = dailyTasksXP.newData
+    xpGains.push({ amount: 10, reason: 'Daily Tasks Completed' })
+    if (dailyTasksXP.leveledUp && dailyTasksXP.newLevel) {
+      finalLevelUp = dailyTasksXP.newLevel
+    }
+
+    // Award XP for completing recommended tasks (from analysis)
+    // For now, we'll award this if the score is in a good range
+    if (calculatedResult.score >= 40) {
+      const recommendedXP = addXP(20, 'Completed Recommended Tasks', currentUserData)
+      currentUserData = recommendedXP.newData
+      xpGains.push({ amount: 20, reason: 'Completed Recommended Tasks' })
+      if (recommendedXP.leveledUp && recommendedXP.newLevel) {
+        finalLevelUp = recommendedXP.newLevel
+      }
+    }
+    
+    // Set level up if any occurred (finalLevelUp will be the most recent/highest)
+    if (finalLevelUp) {
+      setLevelUp(finalLevelUp)
+    }
+
+    // Check and unlock badges
+    const newBadges = checkBadgeConditions(currentUserData)
+    const unlockedBadgeIds: string[] = []
+    newBadges.forEach((badgeId) => {
+      const badgeResult = unlockBadge(badgeId, currentUserData)
+      currentUserData = badgeResult.newData
+      if (badgeResult.unlocked) {
+        unlockedBadgeIds.push(badgeId)
+      }
+    })
+
+    setUserData(currentUserData)
+
+    // Show XP popups sequentially, then show badge unlocks
+    const showNextXP = (index: number) => {
+      if (index < xpGains.length) {
+        setXPGain(xpGains[index])
+        setTimeout(() => {
+          setXPGain(null)
+          if (index < xpGains.length - 1) {
+            setTimeout(() => showNextXP(index + 1), 300)
+          } else {
+            // All XP shown, now show badges
+            if (unlockedBadgeIds.length > 0) {
+              setTimeout(() => {
+                setBadgeUnlock(unlockedBadgeIds[0])
+                // If multiple badges, show them sequentially
+                if (unlockedBadgeIds.length > 1) {
+                  let badgeIndex = 1
+                  const showNextBadge = () => {
+                    if (badgeIndex < unlockedBadgeIds.length) {
+                      setTimeout(() => {
+                        setBadgeUnlock(unlockedBadgeIds[badgeIndex])
+                        badgeIndex++
+                        if (badgeIndex < unlockedBadgeIds.length) {
+                          setTimeout(showNextBadge, 3500)
+                        }
+                      }, 3500)
+                    }
+                  }
+                  setTimeout(showNextBadge, 3500)
+                }
+              }, 500)
+            }
+          }
+        }, 2000)
+      }
+    }
+
+    if (xpGains.length > 0) {
+      showNextXP(0)
+    } else if (unlockedBadgeIds.length > 0) {
+      // No XP but there are badges
+      setBadgeUnlock(unlockedBadgeIds[0])
+      if (unlockedBadgeIds.length > 1) {
+        let badgeIndex = 1
+        const showNextBadge = () => {
+          if (badgeIndex < unlockedBadgeIds.length) {
+            setTimeout(() => {
+              setBadgeUnlock(unlockedBadgeIds[badgeIndex])
+              badgeIndex++
+              if (badgeIndex < unlockedBadgeIds.length) {
+                setTimeout(showNextBadge, 3500)
+              }
+            }, 3500)
+          }
+        }
+        setTimeout(showNextBadge, 3500)
+      }
+    }
   }
 
   const handleChange = (field: keyof FormData, value: number) => {
@@ -69,6 +235,12 @@ function App() {
             See how your habits shape your biology.
           </p>
         </div>
+
+        {/* Gamification Dashboard */}
+        <GamificationDashboard 
+          userData={userData} 
+          onViewBadges={() => setShowBadgesPage(true)}
+        />
 
         {/* Daily Check-In Card */}
         <div className="card">
@@ -330,6 +502,43 @@ function App() {
               })()}
             </div>
           </div>
+        )}
+
+        {/* XP Popup */}
+        {xpGain && (
+          <XPPopup
+            amount={xpGain.amount}
+            reason={xpGain.reason}
+            onComplete={() => setXPGain(null)}
+          />
+        )}
+
+        {/* Badge Unlock Popup */}
+        {badgeUnlock && (
+          <BadgeUnlock
+            badgeId={badgeUnlock}
+            onComplete={() => setBadgeUnlock(null)}
+          />
+        )}
+
+        {/* Level Up Popup */}
+        {levelUp && (
+          <div className="level-up-popup show">
+            <div className="level-up-content">
+              <div className="level-up-icon">🎉</div>
+              <div className="level-up-title">Level Up!</div>
+              <div className="level-up-level">Level {levelUp}</div>
+              <button onClick={() => setLevelUp(null)} className="level-up-button">Awesome!</button>
+            </div>
+          </div>
+        )}
+
+        {/* Badges Page */}
+        {showBadgesPage && (
+          <BadgesPage
+            userData={userData}
+            onClose={() => setShowBadgesPage(false)}
+          />
         )}
       </div>
     </div>

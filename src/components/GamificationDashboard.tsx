@@ -1,4 +1,4 @@
-import { UserData, BADGES } from '../gamification'
+import { type UserData, BADGES } from '../gamification'
 
 interface GamificationDashboardProps {
   userData: UserData

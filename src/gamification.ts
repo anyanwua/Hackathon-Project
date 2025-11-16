@@ -75,7 +75,6 @@ export function calculateXPToNextLevel(level: number): number {
 export function checkForLevelUp(userData: UserData): { leveledUp: boolean; newLevel?: number } {
   if (userData.xp >= userData.xpToNextLevel) {
     const newLevel = userData.level + 1
-    const newXPToNext = calculateXPToNextLevel(newLevel)
     return {
       leveledUp: true,
       newLevel
@@ -84,7 +83,7 @@ export function checkForLevelUp(userData: UserData): { leveledUp: boolean; newLe
   return { leveledUp: false }
 }
 
-export function addXP(amount: number, reason: string, userData: UserData): { newData: UserData; leveledUp: boolean; newLevel?: number } {
+export function addXP(amount: number, _reason: string, userData: UserData): { newData: UserData; leveledUp: boolean; newLevel?: number } {
   const newXP = userData.xp + amount
   const newData = { ...userData, xp: newXP }
   

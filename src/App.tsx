@@ -39,15 +39,24 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 flex items-center justify-center p-4 py-8 relative">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 flex flex-col items-center justify-center p-4 py-8 relative">
+      {/* Header */}
+      <div className="w-full max-w-3xl mx-auto mb-6 text-center animate-fade-in-up">
+        <h1 className="text-3xl md:text-4xl font-bold text-slate-800 tracking-tight mb-2">
+          MindGene OS
+        </h1>
+        <p className="text-base md:text-lg text-slate-600 font-normal">
+          See how your habits shape your biology.
+        </p>
+      </div>
+
       <div className="w-full max-w-3xl mx-auto relative z-10">
         <div className="bg-white rounded-2xl shadow-lg drop-shadow-xl p-8 md:p-12 animate-fade-in-up">
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold mb-3 text-slate-800 tracking-tight">
-              MindGene OS
-            </h1>
-            <p className="text-lg text-slate-600 font-normal">Daily Check-In</p>
-            <div className="mt-6 w-20 h-1 bg-gradient-to-r from-blue-200 via-cyan-200 to-teal-200 mx-auto rounded-full"></div>
+            <h2 className="text-2xl md:text-3xl font-semibold mb-3 text-slate-700 tracking-tight">
+              Daily Check-In
+            </h2>
+            <div className="mt-4 w-20 h-1 bg-gradient-to-r from-blue-200 via-cyan-200 to-teal-200 mx-auto rounded-full"></div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-7">
@@ -167,20 +176,20 @@ function App() {
               {/* Large bold score and category */}
               <div className="text-center mb-8">
                 <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-3 tracking-tight">
-                  Biological Impact Score: <span className="text-blue-600">{result.score}/100</span>
+                  Biological Impact Score: <span className="text-blue-600 animate-count-up inline-block">{result.score}/100</span>
                 </h2>
-                <div className={`inline-block px-5 py-2 rounded-full text-sm font-semibold mb-6 ${
+                <div className={`inline-block px-5 py-2 rounded-full text-sm font-semibold mb-6 animate-count-up ${
                   result.category === 'Low' ? 'bg-emerald-100 text-emerald-700' :
                   result.category === 'Moderate' ? 'bg-amber-100 text-amber-700' :
                   'bg-rose-100 text-rose-700'
-                }`}>
+                }`} style={{ animationDelay: '0.2s' }}>
                   {result.category}
                 </div>
                 
                 {/* Horizontal progress bar */}
                 <div className="w-full bg-slate-200 rounded-full h-6 md:h-7 mb-6 overflow-hidden shadow-inner">
                   <div
-                    className={`h-full rounded-full transition-all duration-1000 ease-out ${
+                    className={`h-full rounded-full animate-progress-fill ${
                       result.category === 'Low' ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' :
                       result.category === 'Moderate' ? 'bg-gradient-to-r from-amber-400 to-amber-500' :
                       'bg-gradient-to-r from-rose-400 to-rose-500'

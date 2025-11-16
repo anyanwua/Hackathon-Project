@@ -3,6 +3,8 @@ import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs/promises';
+import { existsSync } from 'fs';
+import { readFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -45,7 +47,8 @@ async function getUserData(userId = 'default') {
       loginStreak: 0,
       badgesUnlocked: [],
       dailyTasksCompleted: false,
-      points: 0
+      points: 0,
+      completedRecommendations: []
     };
     await writeData(data);
   }
@@ -149,39 +152,130 @@ app.get('/api/user/:userId?', async (req, res) => {
   }
 });
 
-// Linear Regression Model Parameters (from Venture Track)
-// StandardScaler means and stds (estimated from dataset preview)
-// Based on sample data: sleep ~6-8.5h, screen ~3.7-7.4h, exercise ~40-75min, water ~2.4-3.7L, meditation ~0-25min
-const SCALER_MEANS = {
-  sleep_hours: 7.2,
-  screen_time_hours: 5.8,
-  exercise_minutes: 54.0,
-  water_intake_liters: 3.0,
-  meditation_minutes: 11.0
-};
+// Linear Regression Model Parameters (from habit_builder)
+// Try to load from habit_builder/models/model_params.json, fallback to defaults if not available
+let SCALER_MEANS, SCALER_STDS, LR_COEFFICIENTS, LR_INTERCEPT;
 
-const SCALER_STDS = {
-  sleep_hours: 0.8,
-  screen_time_hours: 1.5,
-  exercise_minutes: 12.0,
-  water_intake_liters: 0.5,
-  meditation_minutes: 9.0
-};
+try {
+  const modelParamsPath = join(__dirname, '../habit_builder/models/model_params.json');
+  if (existsSync(modelParamsPath)) {
+    const modelParamsData = readFileSync(modelParamsPath, 'utf8');
+    const modelParams = JSON.parse(modelParamsData);
+    SCALER_MEANS = modelParams.scaler_means;
+    SCALER_STDS = modelParams.scaler_stds;
+    LR_COEFFICIENTS = modelParams.coefficients;
+    LR_INTERCEPT = modelParams.intercept;
+    console.log('Loaded model parameters from habit_builder/models/model_params.json');
+  } else {
+    throw new Error('Model params file not found, using defaults');
+  }
+} catch (error) {
+  console.warn('Could not load model parameters from habit_builder, using default values:', error.message);
+  // Default values (from Venture Track, will be replaced when habit_builder model is trained)
+  SCALER_MEANS = {
+    sleep_hours: 7.2,
+    screen_time_hours: 5.8,
+    exercise_minutes: 54.0,
+    water_intake_liters: 3.0,
+    meditation_minutes: 11.0
+  };
 
-// Linear Regression Coefficients (from standardized model)
-const LR_COEFFICIENTS = {
-  exercise_minutes: 0.278286,
-  screen_time_hours: 0.038877,
-  sleep_hours: -0.006555,
-  water_intake_liters: -0.008884,
-  meditation_minutes: -0.047862
-};
+  SCALER_STDS = {
+    sleep_hours: 0.8,
+    screen_time_hours: 1.5,
+    exercise_minutes: 12.0,
+    water_intake_liters: 0.5,
+    meditation_minutes: 9.0
+  };
 
-const LR_INTERCEPT = 5.108866889054614;
+  LR_COEFFICIENTS = {
+    exercise_minutes: 0.278286,
+    screen_time_hours: 0.038877,
+    sleep_hours: -0.006555,
+    water_intake_liters: -0.008884,
+    meditation_minutes: -0.047862
+  };
+
+  LR_INTERCEPT = 5.108866889054614;
+}
 
 // Standardize a value
 function standardize(value, mean, std) {
   return (value - mean) / std;
+}
+
+// Generate recommendations based on user metrics
+function generateRecommendations(sleepHours, screenTimeHours, exerciseMinutes, waterIntakeLiters, meditationMinutes, predictedStressLevel) {
+  const recommendations = [];
+  
+  // Sleep recommendations
+  if (sleepHours < 7) {
+    recommendations.push({
+      id: 'sleep-low',
+      title: "Prioritize Sleep",
+      description: `Aim for 7-9 hours of sleep. You're currently getting ${sleepHours.toFixed(1)} hours.`,
+      xp: 20
+    });
+  } else if (sleepHours > 9) {
+    recommendations.push({
+      id: 'sleep-high',
+      title: "Optimize Sleep Duration",
+      description: `Consider reducing sleep to 7-9 hours for optimal rest. You're currently getting ${sleepHours.toFixed(1)} hours.`,
+      xp: 20
+    });
+  }
+  
+  // Screen time recommendations
+  if (screenTimeHours > 8) {
+    recommendations.push({
+      id: 'screen-high',
+      title: "Reduce Screen Time",
+      description: `Try to limit screen time to under 8 hours. You're currently at ${screenTimeHours.toFixed(1)} hours.`,
+      xp: 20
+    });
+  }
+  
+  // Exercise recommendations
+  if (exerciseMinutes < 30) {
+    recommendations.push({
+      id: 'exercise-low',
+      title: "Increase Physical Activity",
+      description: `Aim for at least 30 minutes of exercise daily. You're currently at ${exerciseMinutes} minutes.`,
+      xp: 20
+    });
+  }
+  
+  // Water intake recommendations
+  if (waterIntakeLiters < 2) {
+    recommendations.push({
+      id: 'water-low',
+      title: "Stay Hydrated",
+      description: `Aim for 2-3 liters of water daily. You're currently at ${waterIntakeLiters.toFixed(1)}L.`,
+      xp: 20
+    });
+  }
+  
+  // Meditation recommendations
+  if (meditationMinutes < 10 && predictedStressLevel > 5) {
+    recommendations.push({
+      id: 'meditation-low',
+      title: "Practice Mindfulness",
+      description: `Try 10+ minutes of meditation to help manage stress. You're currently at ${meditationMinutes} minutes.`,
+      xp: 20
+    });
+  }
+  
+  // Stress management recommendations
+  if (predictedStressLevel > 6) {
+    recommendations.push({
+      id: 'stress-high',
+      title: "Manage Stress Levels",
+      description: "Your predicted stress is high. Consider deep breathing, breaks, or talking to someone.",
+      xp: 20
+    });
+  }
+  
+  return recommendations;
 }
 
 // Predict stress level using linear regression
@@ -282,13 +376,80 @@ app.post('/api/calculate-score', async (req, res) => {
       personaDescription = 'Your patterns show overall balanced stress and recovery.';
     }
 
+    // Generate recommendations based on user's metrics
+    const recommendations = generateRecommendations(
+      sleepHours,
+      screenTimeHours,
+      exerciseMinutes,
+      waterIntakeLiters,
+      meditationMinutes,
+      predictedStressLevel
+    );
+
     res.json({
       score,
       category,
       message,
       persona,
       personaDescription,
-      predictedStressLevel: Math.round(predictedStressLevel * 10) / 10 // Round to 1 decimal
+      predictedStressLevel: Math.round(predictedStressLevel * 10) / 10, // Round to 1 decimal
+      recommendations
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Complete a recommendation
+app.post('/api/complete-recommendation', async (req, res) => {
+  try {
+    const { userId = 'default', recommendationId } = req.body;
+    
+    const data = await readData();
+    let userData = await getUserData(userId);
+    
+    // Check if already completed today
+    const today = new Date().toISOString().split('T')[0];
+    const hasSubmittedToday = userData.lastCheckinDate === today;
+    
+    if (!hasSubmittedToday) {
+      return res.status(400).json({ error: 'Please submit your daily metrics first' });
+    }
+    
+    // Check if recommendation was already completed
+    if (!userData.completedRecommendations) {
+      userData.completedRecommendations = [];
+    }
+    
+    if (userData.completedRecommendations.includes(recommendationId)) {
+      return res.status(400).json({ error: 'Recommendation already completed' });
+    }
+    
+    // Award XP
+    const xpAmount = 20;
+    userData.xp += xpAmount;
+    userData.points += 25;
+    
+    // Mark as completed
+    userData.completedRecommendations.push(recommendationId);
+    
+    // Check for level up
+    let levelUp = null;
+    const levelCheck = checkForLevelUp(userData);
+    if (levelCheck.leveledUp) {
+      userData.level = levelCheck.newLevel;
+      userData.xpToNextLevel = calculateXPToNextLevel(levelCheck.newLevel);
+      levelUp = levelCheck.newLevel;
+    }
+    
+    // Save user data
+    data.users[userId] = userData;
+    await writeData(data);
+    
+    res.json({
+      userData,
+      xpGain: { amount: xpAmount, reason: 'Recommendation Completed' },
+      levelUp
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -303,9 +464,17 @@ app.post('/api/checkin', async (req, res) => {
     const data = await readData();
     let userData = await getUserData(userId);
     
-    // Update login streak
+    // Check if user has already submitted today
     const today = new Date().toISOString().split('T')[0];
-    if (userData.lastCheckinDate !== today) {
+    const hasSubmittedToday = userData.lastCheckinDate === today;
+    
+    // Reset completed recommendations if it's a new day
+    if (!hasSubmittedToday) {
+      userData.completedRecommendations = [];
+    }
+    
+    // Update login streak (only if not already submitted today)
+    if (!hasSubmittedToday) {
       if (userData.lastCheckinDate === '') {
         userData.loginStreak = 1;
       } else {
@@ -320,15 +489,19 @@ app.post('/api/checkin', async (req, res) => {
       }
     }
     
-    // Update task completion streak
-    const streakUpdate = updateStreak(userData);
-    userData = streakUpdate.newData;
+    // Update task completion streak (only if not already submitted today)
+    let streakUpdate = { newData: userData, streakXP: 0 };
+    if (!hasSubmittedToday) {
+      streakUpdate = updateStreak(userData);
+      userData = streakUpdate.newData;
+    }
     
     const xpGains = [];
     let finalLevelUp = null;
     
-    // Award login XP
-    if (userData.loginStreak === 1 || (userData.loginStreak > 1 && userData.lastCheckinDate !== today)) {
+    // Only award XP if user hasn't submitted today
+    if (!hasSubmittedToday) {
+      // Award login XP
       userData.xp += 5;
       xpGains.push({ amount: 5, reason: 'Daily Login' });
       const levelCheck = checkForLevelUp(userData);
@@ -337,45 +510,46 @@ app.post('/api/checkin', async (req, res) => {
         userData.xpToNextLevel = calculateXPToNextLevel(levelCheck.newLevel);
         finalLevelUp = levelCheck.newLevel;
       }
-    }
-    
-    // Award streak XP
-    if (streakUpdate.streakXP > 0) {
-      userData.xp += streakUpdate.streakXP;
-      xpGains.push({ amount: streakUpdate.streakXP, reason: `${userData.currentStreak}-Day Streak!` });
+      
+      // Award streak XP
+      if (streakUpdate.streakXP > 0) {
+        userData.xp += streakUpdate.streakXP;
+        xpGains.push({ amount: streakUpdate.streakXP, reason: `${userData.currentStreak}-Day Streak!` });
+        const levelCheck = checkForLevelUp(userData);
+        if (levelCheck.leveledUp) {
+          userData.level = levelCheck.newLevel;
+          userData.xpToNextLevel = calculateXPToNextLevel(levelCheck.newLevel);
+          finalLevelUp = levelCheck.newLevel;
+        }
+      }
+      
+      // Award XP for completing all daily inputs
+      userData.xp += 10;
+      userData.points += 25;
+      xpGains.push({ amount: 10, reason: 'Daily Tasks Completed' });
       const levelCheck = checkForLevelUp(userData);
       if (levelCheck.leveledUp) {
         userData.level = levelCheck.newLevel;
         userData.xpToNextLevel = calculateXPToNextLevel(levelCheck.newLevel);
         finalLevelUp = levelCheck.newLevel;
       }
+      
+      // Award XP for completing recommended tasks (if score is good)
+      if (score >= 40) {
+        userData.xp += 20;
+        xpGains.push({ amount: 20, reason: 'Completed Recommended Tasks' });
+        const levelCheck = checkForLevelUp(userData);
+        if (levelCheck.leveledUp) {
+          userData.level = levelCheck.newLevel;
+          userData.xpToNextLevel = calculateXPToNextLevel(levelCheck.newLevel);
+          finalLevelUp = levelCheck.newLevel;
+        }
+      }
     }
     
-    // Mark daily tasks as completed
+    // Mark daily tasks as completed and update last checkin date
     userData.dailyTasksCompleted = true;
-    
-    // Award XP for completing all daily inputs
-    userData.xp += 10;
-    userData.points += 25;
-    xpGains.push({ amount: 10, reason: 'Daily Tasks Completed' });
-    const levelCheck = checkForLevelUp(userData);
-    if (levelCheck.leveledUp) {
-      userData.level = levelCheck.newLevel;
-      userData.xpToNextLevel = calculateXPToNextLevel(levelCheck.newLevel);
-      finalLevelUp = levelCheck.newLevel;
-    }
-    
-    // Award XP for completing recommended tasks (if score is good)
-    if (score >= 40) {
-      userData.xp += 20;
-      xpGains.push({ amount: 20, reason: 'Completed Recommended Tasks' });
-      const levelCheck = checkForLevelUp(userData);
-      if (levelCheck.leveledUp) {
-        userData.level = levelCheck.newLevel;
-        userData.xpToNextLevel = calculateXPToNextLevel(levelCheck.newLevel);
-        finalLevelUp = levelCheck.newLevel;
-      }
-    }
+    userData.lastCheckinDate = today;
     
     // Check and unlock badges
     const newBadges = checkBadgeConditions(userData);

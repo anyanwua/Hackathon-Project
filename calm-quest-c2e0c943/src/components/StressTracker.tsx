@@ -7,29 +7,30 @@ import { Progress } from "@/components/ui/progress";
 import { Sparkles, TrendingDown, Award, Flame } from "lucide-react";
 import { toast } from "sonner";
 import { StressCircle } from "./StressCircle";
-import { getUserData, calculateScore, submitCheckin, mapFactorsToScoring, type UserData, type ScoreResult } from "@/lib/api";
+import { getUserData, calculateScore, submitCheckin, completeRecommendation, type UserData, type ScoreResult, type Recommendation } from "@/lib/api";
 
 interface StressFactors {
-  sleep: number;
-  workload: number;
-  exercise: number;
-  social: number;
-  nutrition: number;
+  sleepHours: number;
+  screenTimeHours: number;
+  exerciseMinutes: number;
+  waterIntakeLiters: number;
+  meditationMinutes: number;
 }
 
 export const StressTracker = () => {
   const [factors, setFactors] = useState<StressFactors>({
-    sleep: 7,
-    workload: 5,
-    exercise: 3,
-    social: 5,
-    nutrition: 5,
+    sleepHours: 7,
+    screenTimeHours: 6,
+    exerciseMinutes: 30,
+    waterIntakeLiters: 2.5,
+    meditationMinutes: 10,
   });
 
   const [userData, setUserData] = useState<UserData | null>(null);
   const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null);
   const [isCalculated, setIsCalculated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
 
   // Load user data on mount
   useEffect(() => {
@@ -48,9 +49,6 @@ export const StressTracker = () => {
 
   const xpProgress = userData ? (userData.xp / userData.xpToNextLevel) * 100 : 0;
 
-  // Calculate stress level from score (inverse of biological impact score)
-  const stressLevel = scoreResult ? 100 - scoreResult.score : 0;
-
   const getStressColor = (level: number): string => {
     if (level < 30) return "success";
     if (level < 60) return "accent";
@@ -60,29 +58,33 @@ export const StressTracker = () => {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      // Map factors to linear regression model inputs
-      const scoringInputs = mapFactorsToScoring(factors);
-      
-      // Calculate score using linear regression model
+      // Calculate score using linear regression model with direct inputs
       const score = await calculateScore(
-        scoringInputs.sleepHours,
-        scoringInputs.screenTimeHours,
-        scoringInputs.exerciseMinutes,
-        scoringInputs.waterIntakeLiters,
-        scoringInputs.meditationMinutes
+        factors.sleepHours,
+        factors.screenTimeHours,
+        factors.exerciseMinutes,
+        factors.waterIntakeLiters,
+        factors.meditationMinutes
       );
       
       setScoreResult(score);
       setIsCalculated(true);
       
+      // Filter out already completed recommendations
+      const completedIds = userData?.completedRecommendations || [];
+      const availableRecommendations = (score.recommendations || []).filter(
+        (rec) => !completedIds.includes(rec.id)
+      );
+      setRecommendations(availableRecommendations);
+      
       // Submit check-in
       const checkinResponse = await submitCheckin(
         'default',
-        scoringInputs.sleepHours,
-        scoringInputs.screenTimeHours,
-        scoringInputs.exerciseMinutes,
-        scoringInputs.waterIntakeLiters,
-        scoringInputs.meditationMinutes,
+        factors.sleepHours,
+        factors.screenTimeHours,
+        factors.exerciseMinutes,
+        factors.waterIntakeLiters,
+        factors.meditationMinutes,
         score.score
       );
       
@@ -138,6 +140,11 @@ export const StressTracker = () => {
     setIsCalculated(false);
     setScoreResult(null);
   };
+
+  // Calculate stress level from score
+  // Score = 100 - (predictedStressLevel * 10), so stressLevel = 100 - score
+  // This is more reliable than using predictedStressLevel directly
+  const stressLevel = scoreResult ? 100 - scoreResult.score : 0;
 
   if (!userData) {
     return (
@@ -207,7 +214,16 @@ export const StressTracker = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex flex-col items-center py-4">
-              <StressCircle factors={factors} stressLevel={stressLevel} />
+              <StressCircle 
+                factors={{
+                  sleepHours: factors.sleepHours,
+                  screenTimeHours: factors.screenTimeHours,
+                  exerciseMinutes: factors.exerciseMinutes,
+                  waterIntakeLiters: factors.waterIntakeLiters,
+                  meditationMinutes: factors.meditationMinutes
+                }} 
+                stressLevel={stressLevel} 
+              />
             </div>
             
             <div className="space-y-4">
@@ -239,6 +255,51 @@ export const StressTracker = () => {
                 <p className="text-sm text-muted-foreground mb-2">Insights:</p>
                 <p className="text-sm text-foreground">{scoreResult.message}</p>
               </div>
+              
+              {/* Recommendations */}
+              {recommendations.length > 0 && (
+                <div className="p-4 rounded-lg bg-secondary/50 border border-border/30">
+                  <p className="text-sm font-semibold text-foreground mb-3">Recommended Tasks:</p>
+                  <div className="space-y-2">
+                    {recommendations.map((rec) => (
+                      <div
+                        key={rec.id}
+                        className="flex items-start justify-between p-3 rounded-lg bg-background/50 border border-border/20 hover:bg-background/70 transition-colors"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-sm font-semibold text-foreground">{rec.title}</p>
+                            <span className="text-xs font-medium text-accent bg-accent/10 px-2 py-0.5 rounded">
+                              +{rec.xp} XP
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{rec.description}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              const result = await completeRecommendation('default', rec.id);
+                              setUserData(result.userData);
+                              setRecommendations(recommendations.filter((r) => r.id !== rec.id));
+                              toast.success(`+${result.xpGain.amount} XP - ${result.xpGain.reason}`);
+                              if (result.levelUp) {
+                                toast.success(`Level Up! You're now level ${result.levelUp}`);
+                              }
+                            } catch (error) {
+                              toast.error(error instanceof Error ? error.message : 'Failed to complete recommendation');
+                            }
+                          }}
+                          className="ml-3"
+                        >
+                          Complete
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             
             <Button
@@ -261,10 +322,13 @@ export const StressTracker = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Sleep (hours): {factors.sleep}h</Label>
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <span>💤</span>
+                <span>Sleep Hours: {factors.sleepHours}h</span>
+              </Label>
               <Slider
-                value={[factors.sleep]}
-                onValueChange={(val) => updateFactor("sleep", val)}
+                value={[factors.sleepHours]}
+                onValueChange={(val) => updateFactor("sleepHours", val)}
                 min={0}
                 max={12}
                 step={0.5}
@@ -274,51 +338,63 @@ export const StressTracker = () => {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Work Stress: {factors.workload}/10</Label>
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <span>📱</span>
+                <span>Screen Time Hours: {factors.screenTimeHours}h</span>
+              </Label>
               <Slider
-                value={[factors.workload]}
-                onValueChange={(val) => updateFactor("workload", val)}
+                value={[factors.screenTimeHours]}
+                onValueChange={(val) => updateFactor("screenTimeHours", val)}
                 min={0}
-                max={10}
-                step={1}
+                max={16}
+                step={0.5}
                 className="cursor-pointer"
                 disabled={isLoading}
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Exercise: {factors.exercise}/10</Label>
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <span>💪</span>
+                <span>Exercise Minutes: {factors.exerciseMinutes}min</span>
+              </Label>
               <Slider
-                value={[factors.exercise]}
-                onValueChange={(val) => updateFactor("exercise", val)}
+                value={[factors.exerciseMinutes]}
+                onValueChange={(val) => updateFactor("exerciseMinutes", val)}
                 min={0}
-                max={10}
-                step={1}
+                max={180}
+                step={5}
                 className="cursor-pointer"
                 disabled={isLoading}
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Social Connection: {factors.social}/10</Label>
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <span>💧</span>
+                <span>Water Intake: {factors.waterIntakeLiters}L</span>
+              </Label>
               <Slider
-                value={[factors.social]}
-                onValueChange={(val) => updateFactor("social", val)}
+                value={[factors.waterIntakeLiters]}
+                onValueChange={(val) => updateFactor("waterIntakeLiters", val)}
                 min={0}
-                max={10}
-                step={1}
+                max={5}
+                step={0.1}
                 className="cursor-pointer"
                 disabled={isLoading}
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Nutrition Quality: {factors.nutrition}/10</Label>
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <span>🧘</span>
+                <span>Meditation Minutes: {factors.meditationMinutes}min</span>
+              </Label>
               <Slider
-                value={[factors.nutrition]}
-                onValueChange={(val) => updateFactor("nutrition", val)}
+                value={[factors.meditationMinutes]}
+                onValueChange={(val) => updateFactor("meditationMinutes", val)}
                 min={0}
-                max={10}
+                max={60}
                 step={1}
                 className="cursor-pointer"
                 disabled={isLoading}

@@ -10,6 +10,14 @@ export interface UserData {
   badgesUnlocked: string[];
   dailyTasksCompleted: boolean;
   points: number;
+  completedRecommendations?: string[];
+}
+
+export interface Recommendation {
+  id: string;
+  title: string;
+  description: string;
+  xp: number;
 }
 
 export interface ScoreResult {
@@ -19,6 +27,7 @@ export interface ScoreResult {
   persona: string;
   personaDescription: string;
   predictedStressLevel?: number;
+  recommendations?: Recommendation[];
 }
 
 export interface CheckinResponse {
@@ -99,33 +108,28 @@ export async function submitCheckin(
   return response.json();
 }
 
-// Map calm-quest factors to linear regression model inputs
-export function mapFactorsToScoring(factors: {
-  sleep: number;
-  workload: number;
-  exercise: number;
-  social: number;
-  nutrition: number;
-}) {
-  // Map calm-quest factors to linear regression model inputs:
-  // sleep: hours (0-12) - direct mapping
-  // exercise: (0-10) -> map to minutes (0-180)
-  // screen_time: estimate from workload (higher workload = more screen time)
-  // water_intake: estimate from nutrition (better nutrition = more water)
-  // meditation: estimate from social (more social = less meditation needed, but we'll use inverse)
-  
-  const sleepHours = factors.sleep;
-  const exerciseMinutes = (factors.exercise / 10) * 180; // Map 0-10 to 0-180
-  const screenTimeHours = 3 + (factors.workload / 10) * 7; // Map 0-10 workload to 3-10 hours screen time
-  const waterIntakeLiters = 1.5 + (factors.nutrition / 10) * 2; // Map 0-10 nutrition to 1.5-3.5L water
-  const meditationMinutes = (10 - factors.social) * 2; // Inverse: less social = more meditation needed (0-20 min)
-  
-  return {
-    sleepHours,
-    screenTimeHours: Math.max(0, Math.min(16, screenTimeHours)),
-    exerciseMinutes: Math.round(Math.max(0, Math.min(180, exerciseMinutes))),
-    waterIntakeLiters: Math.max(0.5, Math.min(5, waterIntakeLiters)),
-    meditationMinutes: Math.max(0, Math.min(60, meditationMinutes)),
-  };
+// Complete a recommendation
+export async function completeRecommendation(
+  userId: string = 'default',
+  recommendationId: string
+): Promise<{ userData: UserData; xpGain: { amount: number; reason: string }; levelUp: number | null }> {
+  const response = await fetch(`${API_BASE_URL}/api/complete-recommendation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      userId,
+      recommendationId,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to complete recommendation');
+  }
+
+  return response.json();
 }
+
 

@@ -2,11 +2,17 @@ import { useState, useEffect } from "react";
 
 interface StressCircleProps {
   factors: {
-    sleep: number;
-    workload: number;
-    exercise: number;
-    social: number;
-    nutrition: number;
+    sleepHours?: number;
+    screenTimeHours?: number;
+    exerciseMinutes?: number;
+    waterIntakeLiters?: number;
+    meditationMinutes?: number;
+    // Legacy support
+    sleep?: number;
+    workload?: number;
+    exercise?: number;
+    social?: number;
+    nutrition?: number;
   };
   stressLevel: number;
 }
@@ -25,14 +31,46 @@ export const StressCircle = ({ factors, stressLevel }: StressCircleProps) => {
       clearTimeout(timer2);
     };
   }, []);
-  const getFactorScore = (key: keyof typeof factors): number => {
-    if (key === 'sleep') {
+  const getFactorScore = (key: string): number => {
+    // New metrics
+    if (key === 'sleep' && factors.sleepHours !== undefined) {
+      return ((10 - Math.abs(8 - factors.sleepHours)) / 10) * 100;
+    }
+    if (key === 'screen' && factors.screenTimeHours !== undefined) {
+      // Lower screen time is better (ideal <= 4h)
+      return Math.max(0, ((10 - (factors.screenTimeHours - 4)) / 10) * 100);
+    }
+    if (key === 'exercise' && factors.exerciseMinutes !== undefined) {
+      // More exercise is better (ideal >= 30min)
+      return Math.min(100, (factors.exerciseMinutes / 30) * 100);
+    }
+    if (key === 'water' && factors.waterIntakeLiters !== undefined) {
+      // Ideal 2-3L
+      const ideal = 2.5;
+      const deviation = Math.abs(ideal - factors.waterIntakeLiters) * 2;
+      return Math.max(0, ((10 - deviation) / 10) * 100);
+    }
+    if (key === 'meditation' && factors.meditationMinutes !== undefined) {
+      // More meditation is better (ideal >= 10min)
+      return Math.min(100, (factors.meditationMinutes / 10) * 100);
+    }
+    // Legacy support
+    if (key === 'sleep' && factors.sleep !== undefined) {
       return ((10 - Math.abs(7.5 - factors.sleep)) / 10) * 100;
     }
-    if (key === 'workload') {
+    if (key === 'workload' && factors.workload !== undefined) {
       return ((10 - factors.workload) / 10) * 100;
     }
-    return (factors[key] / 10) * 100;
+    if (key === 'exercise' && factors.exercise !== undefined) {
+      return (factors.exercise / 10) * 100;
+    }
+    if (key === 'social' && factors.social !== undefined) {
+      return (factors.social / 10) * 100;
+    }
+    if (key === 'nutrition' && factors.nutrition !== undefined) {
+      return (factors.nutrition / 10) * 100;
+    }
+    return 0;
   };
 
   const getColor = (score: number): string => {
@@ -41,7 +79,16 @@ export const StressCircle = ({ factors, stressLevel }: StressCircleProps) => {
     return 'hsl(var(--destructive))';
   };
 
-  const rings = [
+  // Use new metrics if available, otherwise fall back to legacy
+  const useNewMetrics = factors.sleepHours !== undefined || factors.screenTimeHours !== undefined;
+  
+  const rings = useNewMetrics ? [
+    { key: 'sleep', label: 'Sleep', radius: 140 },
+    { key: 'screen', label: 'Screen', radius: 115 },
+    { key: 'exercise', label: 'Exercise', radius: 90 },
+    { key: 'water', label: 'Water', radius: 65 },
+    { key: 'meditation', label: 'Meditation', radius: 40 },
+  ] : [
     { key: 'sleep', label: 'Sleep', radius: 140 },
     { key: 'workload', label: 'Work', radius: 115 },
     { key: 'exercise', label: 'Exercise', radius: 90 },

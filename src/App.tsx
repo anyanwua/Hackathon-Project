@@ -157,7 +157,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="mb-4">
                 <div className="bg-white p-4 rounded-lg">
                   <div className="text-sm text-gray-600 mb-1">Category</div>
                   <div className={`text-xl font-semibold ${
@@ -168,18 +168,12 @@ function App() {
                     {result.category}
                   </div>
                 </div>
-                <div className="bg-white p-4 rounded-lg">
-                  <div className="text-sm text-gray-600 mb-1">Persona</div>
-                  <div className="text-xl font-semibold text-indigo-600">
-                    {result.persona}
-                  </div>
-                </div>
               </div>
 
               <div className="bg-white p-4 rounded-lg">
-                <div className="text-sm text-gray-600 mb-2">Explanation</div>
+                <div className="text-sm text-gray-600 mb-2">Message</div>
                 <div className="text-gray-800 leading-relaxed">
-                  {result.explanation}
+                  {result.message}
                 </div>
               </div>
             </div>

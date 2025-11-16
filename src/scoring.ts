@@ -1,8 +1,7 @@
 export interface Result {
   score: number
   category: 'Low' | 'Moderate' | 'High'
-  explanation: string
-  persona: string
+  message: string
 }
 
 export function calculateImpactScore(
@@ -12,86 +11,71 @@ export function calculateImpactScore(
   exerciseMinutes: number,
   moodLevel: number
 ): Result {
-  let score = 50 // Base score
+  // Step 1: Compute penalty values (0-1) based on deviation from healthy ranges
+  const sleepPenalty = Math.max(0, Math.abs(sleepHours - 8) / 8)
+  const stressPenalty = (stressLevel - 1) / 4
+  const screenPenalty = Math.max(0, (screenTimeHours - 4) / 8)
+  const exercisePenalty = Math.max(0, (30 - exerciseMinutes) / 60)
+  const moodPenalty = (5 - moodLevel) / 4
 
-  // Sleep impact (optimal: 7-9 hours)
-  if (sleepHours >= 7 && sleepHours <= 9) {
-    score += 15
-  } else if (sleepHours >= 6 && sleepHours < 7) {
-    score += 5
-  } else if (sleepHours > 9 && sleepHours <= 10) {
-    score += 10
-  } else {
-    score -= 20
-  }
+  // Step 2: Weighted sum
+  const raw =
+    0.30 * sleepPenalty +
+    0.25 * stressPenalty +
+    0.20 * screenPenalty +
+    0.15 * exercisePenalty +
+    0.10 * moodPenalty
 
-  // Stress impact (lower is better, scale 1-5)
-  const stressScore = (5 - stressLevel) * 4
-  score += stressScore
+  // Step 3: Convert to 0-100
+  const score = Math.max(0, Math.min(100, Math.round(raw * 100)))
 
-  // Screen time impact (lower is better)
-  if (screenTimeHours <= 4) {
-    score += 15
-  } else if (screenTimeHours <= 6) {
-    score += 5
-  } else if (screenTimeHours <= 8) {
-    score -= 5
-  } else {
-    score -= 15
-  }
-
-  // Exercise impact (optimal: 30-60 minutes)
-  if (exerciseMinutes >= 30 && exerciseMinutes <= 60) {
-    score += 15
-  } else if (exerciseMinutes >= 15 && exerciseMinutes < 30) {
-    score += 5
-  } else if (exerciseMinutes > 60 && exerciseMinutes <= 90) {
-    score += 10
-  } else if (exerciseMinutes > 90) {
-    score += 5
-  } else {
-    score -= 10
-  }
-
-  // Mood impact (higher is better, scale 1-5)
-  const moodScore = (moodLevel - 3) * 4
-  score += moodScore
-
-  // Clamp score between 0 and 100
-  score = Math.max(0, Math.min(100, score))
-
-  // Determine category
+  // Step 4: Category rules
   let category: 'Low' | 'Moderate' | 'High'
-  if (score >= 70) {
-    category = 'High'
-  } else if (score >= 40) {
+  if (score <= 33) {
+    category = 'Low'
+  } else if (score >= 34 && score <= 66) {
     category = 'Moderate'
   } else {
-    category = 'Low'
+    category = 'High'
   }
 
-  // Generate explanation
-  let explanation = ''
+  // Step 5: Generate message explaining stress, sleep, and lifestyle impact
+  let message = ''
+  
   if (category === 'High') {
-    explanation = 'Your daily habits show excellent biological alignment. You\'re maintaining optimal sleep, managing stress well, and staying active. Keep up the great work!'
+    if (sleepPenalty < 0.25 && stressPenalty < 0.5 && screenPenalty < 0.5) {
+      message = 'Your biological impact score reflects excellent lifestyle balance. Your sleep patterns are optimal, stress levels are well-managed, and screen time is within healthy limits. Continue maintaining these positive habits for sustained wellness.'
+    } else if (sleepPenalty >= 0.5) {
+      message = 'Your biological impact score is high, but sleep quality needs attention. While your stress management and lifestyle choices are contributing positively, improving sleep duration and consistency will further enhance your overall biological health.'
+    } else if (stressPenalty >= 0.75) {
+      message = 'Your biological impact score is high, though stress management could be improved. Your sleep and lifestyle habits are solid, but reducing stress through mindfulness or relaxation techniques would optimize your biological wellness.'
+    } else {
+      message = 'Your biological impact score is high, indicating strong overall wellness. Your sleep and stress management are on track, and your lifestyle choices support good biological health. Keep up the excellent work!'
+    }
   } else if (category === 'Moderate') {
-    explanation = 'Your biological impact is in a moderate range. There\'s room for improvement in some areas. Consider adjusting sleep patterns, reducing screen time, or increasing physical activity.'
+    if (sleepPenalty >= 0.5 && stressPenalty >= 0.5) {
+      message = 'Your biological impact score is moderate, with both sleep and stress areas needing improvement. Focus on establishing a consistent sleep schedule of 7-9 hours and implementing stress-reduction strategies. These changes will significantly improve your biological wellness.'
+    } else if (sleepPenalty >= 0.5) {
+      message = 'Your biological impact score is moderate, primarily due to sleep patterns that deviate from the optimal 8-hour range. Your stress management and lifestyle choices are reasonable, but improving sleep quality and duration would boost your biological health.'
+    } else if (stressPenalty >= 0.5) {
+      message = 'Your biological impact score is moderate, with elevated stress levels being a key factor. Your sleep patterns are decent, but implementing stress management techniques such as meditation, exercise, or time management would improve your overall biological wellness.'
+    } else if (screenPenalty >= 0.5 || exercisePenalty >= 0.5) {
+      message = 'Your biological impact score is moderate, with lifestyle factors like screen time or exercise levels affecting your wellness. Your sleep and stress management are adequate, but balancing screen usage and increasing physical activity would enhance your biological health.'
+    } else {
+      message = 'Your biological impact score is moderate, indicating a balanced but improvable wellness profile. Your sleep, stress, and lifestyle habits are within acceptable ranges, but optimizing each area would move you toward better biological health.'
+    }
   } else {
-    explanation = 'Your biological impact score indicates areas that need attention. Focus on improving sleep quality, reducing stress, limiting screen time, and incorporating regular exercise.'
+    // Low category
+    if (sleepPenalty >= 0.75 && stressPenalty >= 0.75) {
+      message = 'Your biological impact score is low, with both sleep and stress requiring immediate attention. Prioritize establishing a regular sleep schedule of 7-9 hours and implementing daily stress-reduction practices. These fundamental changes are crucial for improving your biological wellness.'
+    } else if (sleepPenalty >= 0.75) {
+      message = 'Your biological impact score is low, primarily due to significant sleep disruption. Aim for 7-9 hours of consistent sleep nightly, as this is foundational to biological health. While stress and lifestyle factors also need attention, sleep improvement should be your top priority.'
+    } else if (stressPenalty >= 0.75) {
+      message = 'Your biological impact score is low, with high stress levels significantly impacting your biological wellness. Implement stress management strategies immediately—consider meditation, regular exercise, or professional support. Your sleep patterns also need attention to support stress recovery.'
+    } else {
+      message = 'Your biological impact score is low, indicating multiple areas need improvement. Focus on establishing healthy sleep patterns (7-9 hours), reducing stress through proven techniques, and balancing screen time with physical activity. These lifestyle changes will significantly improve your biological health.'
+    }
   }
 
-  // Determine persona
-  let persona = ''
-  if (score >= 80) {
-    persona = 'Optimal Optimizer'
-  } else if (score >= 60) {
-    persona = 'Balanced Builder'
-  } else if (score >= 40) {
-    persona = 'Progress Seeker'
-  } else {
-    persona = 'Transformation Catalyst'
-  }
-
-  return { score, category, explanation, persona }
+  return { score, category, message }
 }
-

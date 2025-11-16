@@ -12,7 +12,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: 'kern' 1;
   text-rendering: optimizeLegibility;
-  background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 50%, #cffafe 100%);
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 25%, #e0f2fe 50%, #dbeafe 75%, #cffafe 100%);
 }
 
 /* Custom scrollbar */

@@ -2,6 +2,8 @@ export interface Result {
   score: number
   category: 'Low' | 'Moderate' | 'High'
   message: string
+  persona: string
+  personaDescription: string
 }
 
 export function calculateImpactScore(
@@ -77,5 +79,23 @@ export function calculateImpactScore(
     }
   }
 
-  return { score, category, message }
+  // Determine persona based on simple rules
+  let persona: string
+  let personaDescription: string
+
+  if (sleepHours < 6 && stressLevel >= 4 && screenTimeHours >= 6) {
+    persona = '🔥 Wired Night Owl'
+    personaDescription = 'Low sleep combined with high stress and high screen time suggests disrupted recovery patterns.'
+  } else if (exerciseMinutes < 15 && moodLevel <= 2) {
+    persona = '📉 Flat-Lined & Exhausted'
+    personaDescription = 'Low movement and low mood indicate depleted energy and reduced resilience.'
+  } else if (screenTimeHours > 8 && stressLevel >= 3) {
+    persona = '📱 Doomscrolling Achiever'
+    personaDescription = 'High screen time with moderate stress suggests cognitive overload and poor recovery.'
+  } else {
+    persona = '🧘 Resilient Baseline'
+    personaDescription = 'Your patterns show overall balanced stress and recovery.'
+  }
+
+  return { score, category, message, persona, personaDescription }
 }

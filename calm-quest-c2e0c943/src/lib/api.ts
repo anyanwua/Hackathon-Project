@@ -18,6 +18,7 @@ export interface ScoreResult {
   message: string;
   persona: string;
   personaDescription: string;
+  predictedStressLevel?: number;
 }
 
 export interface CheckinResponse {
@@ -36,13 +37,13 @@ export async function getUserData(userId: string = 'default'): Promise<UserData>
   return response.json();
 }
 
-// Calculate impact score
+// Calculate impact score using linear regression model
 export async function calculateScore(
   sleepHours: number,
-  stressLevel: number,
   screenTimeHours: number,
   exerciseMinutes: number,
-  moodLevel: number
+  waterIntakeLiters: number,
+  meditationMinutes: number
 ): Promise<ScoreResult> {
   const response = await fetch(`${API_BASE_URL}/api/calculate-score`, {
     method: 'POST',
@@ -51,10 +52,10 @@ export async function calculateScore(
     },
     body: JSON.stringify({
       sleepHours,
-      stressLevel,
       screenTimeHours,
       exerciseMinutes,
-      moodLevel,
+      waterIntakeLiters,
+      meditationMinutes,
     }),
   });
 
@@ -69,10 +70,10 @@ export async function calculateScore(
 export async function submitCheckin(
   userId: string,
   sleepHours: number,
-  stressLevel: number,
   screenTimeHours: number,
   exerciseMinutes: number,
-  moodLevel: number,
+  waterIntakeLiters: number,
+  meditationMinutes: number,
   score: number
 ): Promise<CheckinResponse> {
   const response = await fetch(`${API_BASE_URL}/api/checkin`, {
@@ -83,10 +84,10 @@ export async function submitCheckin(
     body: JSON.stringify({
       userId,
       sleepHours,
-      stressLevel,
       screenTimeHours,
       exerciseMinutes,
-      moodLevel,
+      waterIntakeLiters,
+      meditationMinutes,
       score,
     }),
   });
@@ -98,7 +99,7 @@ export async function submitCheckin(
   return response.json();
 }
 
-// Map calm-quest factors to MindGene scoring system
+// Map calm-quest factors to linear regression model inputs
 export function mapFactorsToScoring(factors: {
   sleep: number;
   workload: number;
@@ -106,25 +107,25 @@ export function mapFactorsToScoring(factors: {
   social: number;
   nutrition: number;
 }) {
-  // Map calm-quest factors to MindGene inputs:
+  // Map calm-quest factors to linear regression model inputs:
   // sleep: hours (0-12) - direct mapping
-  // workload: stress level (0-10) -> map to 1-5 scale
   // exercise: (0-10) -> map to minutes (0-180)
-  // social: not directly used, but can influence mood
-  // nutrition: not directly used, but can influence mood
+  // screen_time: estimate from workload (higher workload = more screen time)
+  // water_intake: estimate from nutrition (better nutrition = more water)
+  // meditation: estimate from social (more social = less meditation needed, but we'll use inverse)
   
   const sleepHours = factors.sleep;
-  const stressLevel = Math.ceil((factors.workload / 10) * 5); // Map 0-10 to 1-5
   const exerciseMinutes = (factors.exercise / 10) * 180; // Map 0-10 to 0-180
-  const screenTimeHours = 6; // Default, could be added to calm-quest later
-  const moodLevel = Math.ceil(((factors.social + factors.nutrition) / 2 / 10) * 5); // Average social + nutrition, map to 1-5
+  const screenTimeHours = 3 + (factors.workload / 10) * 7; // Map 0-10 workload to 3-10 hours screen time
+  const waterIntakeLiters = 1.5 + (factors.nutrition / 10) * 2; // Map 0-10 nutrition to 1.5-3.5L water
+  const meditationMinutes = (10 - factors.social) * 2; // Inverse: less social = more meditation needed (0-20 min)
   
   return {
     sleepHours,
-    stressLevel: Math.max(1, Math.min(5, stressLevel)),
-    screenTimeHours,
-    exerciseMinutes: Math.round(exerciseMinutes),
-    moodLevel: Math.max(1, Math.min(5, moodLevel)),
+    screenTimeHours: Math.max(0, Math.min(16, screenTimeHours)),
+    exerciseMinutes: Math.round(Math.max(0, Math.min(180, exerciseMinutes))),
+    waterIntakeLiters: Math.max(0.5, Math.min(5, waterIntakeLiters)),
+    meditationMinutes: Math.max(0, Math.min(60, meditationMinutes)),
   };
 }
 

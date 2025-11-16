@@ -60,16 +60,16 @@ export const StressTracker = () => {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      // Map factors to scoring system
+      // Map factors to linear regression model inputs
       const scoringInputs = mapFactorsToScoring(factors);
       
-      // Calculate score
+      // Calculate score using linear regression model
       const score = await calculateScore(
         scoringInputs.sleepHours,
-        scoringInputs.stressLevel,
         scoringInputs.screenTimeHours,
         scoringInputs.exerciseMinutes,
-        scoringInputs.moodLevel
+        scoringInputs.waterIntakeLiters,
+        scoringInputs.meditationMinutes
       );
       
       setScoreResult(score);
@@ -79,10 +79,10 @@ export const StressTracker = () => {
       const checkinResponse = await submitCheckin(
         'default',
         scoringInputs.sleepHours,
-        scoringInputs.stressLevel,
         scoringInputs.screenTimeHours,
         scoringInputs.exerciseMinutes,
-        scoringInputs.moodLevel,
+        scoringInputs.waterIntakeLiters,
+        scoringInputs.meditationMinutes,
         score.score
       );
       
@@ -222,6 +222,11 @@ export const StressTracker = () => {
                 }`}>
                   {scoreResult.category} Impact
                 </p>
+                {scoreResult.predictedStressLevel !== undefined && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Predicted Stress Level: {scoreResult.predictedStressLevel}/10
+                  </p>
+                )}
               </div>
               
               <div className="p-4 rounded-lg bg-secondary/50 border border-border/30">

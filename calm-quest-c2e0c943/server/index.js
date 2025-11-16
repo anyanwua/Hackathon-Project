@@ -149,86 +149,134 @@ app.get('/api/user/:userId?', async (req, res) => {
   }
 });
 
+// Linear Regression Model Parameters (from Venture Track)
+// StandardScaler means and stds (estimated from dataset preview)
+// Based on sample data: sleep ~6-8.5h, screen ~3.7-7.4h, exercise ~40-75min, water ~2.4-3.7L, meditation ~0-25min
+const SCALER_MEANS = {
+  sleep_hours: 7.2,
+  screen_time_hours: 5.8,
+  exercise_minutes: 54.0,
+  water_intake_liters: 3.0,
+  meditation_minutes: 11.0
+};
+
+const SCALER_STDS = {
+  sleep_hours: 0.8,
+  screen_time_hours: 1.5,
+  exercise_minutes: 12.0,
+  water_intake_liters: 0.5,
+  meditation_minutes: 9.0
+};
+
+// Linear Regression Coefficients (from standardized model)
+const LR_COEFFICIENTS = {
+  exercise_minutes: 0.278286,
+  screen_time_hours: 0.038877,
+  sleep_hours: -0.006555,
+  water_intake_liters: -0.008884,
+  meditation_minutes: -0.047862
+};
+
+const LR_INTERCEPT = 5.108866889054614;
+
+// Standardize a value
+function standardize(value, mean, std) {
+  return (value - mean) / std;
+}
+
+// Predict stress level using linear regression
+function predictStressLevel(sleepHours, screenTimeHours, exerciseMinutes, waterIntakeLiters, meditationMinutes) {
+  // Standardize each feature
+  const sleep_scaled = standardize(sleepHours, SCALER_MEANS.sleep_hours, SCALER_STDS.sleep_hours);
+  const screen_scaled = standardize(screenTimeHours, SCALER_MEANS.screen_time_hours, SCALER_STDS.screen_time_hours);
+  const exercise_scaled = standardize(exerciseMinutes, SCALER_MEANS.exercise_minutes, SCALER_STDS.exercise_minutes);
+  const water_scaled = standardize(waterIntakeLiters, SCALER_MEANS.water_intake_liters, SCALER_STDS.water_intake_liters);
+  const meditation_scaled = standardize(meditationMinutes, SCALER_MEANS.meditation_minutes, SCALER_STDS.meditation_minutes);
+
+  // Calculate predicted stress level
+  const predictedStress = LR_INTERCEPT +
+    (LR_COEFFICIENTS.sleep_hours * sleep_scaled) +
+    (LR_COEFFICIENTS.screen_time_hours * screen_scaled) +
+    (LR_COEFFICIENTS.exercise_minutes * exercise_scaled) +
+    (LR_COEFFICIENTS.water_intake_liters * water_scaled) +
+    (LR_COEFFICIENTS.meditation_minutes * meditation_scaled);
+
+  // Clamp to reasonable range (0-10)
+  return Math.max(0, Math.min(10, predictedStress));
+}
+
 // Calculate impact score
 app.post('/api/calculate-score', async (req, res) => {
   try {
-    const { sleepHours, stressLevel, screenTimeHours, exerciseMinutes, moodLevel } = req.body;
+    const { sleepHours, screenTimeHours, exerciseMinutes, waterIntakeLiters, meditationMinutes } = req.body;
 
-    // Calculate penalty values
-    const sleepPenalty = Math.max(0, Math.abs(sleepHours - 8) / 8);
-    const stressPenalty = (stressLevel - 1) / 4;
-    const screenPenalty = Math.max(0, (screenTimeHours - 4) / 8);
-    const exercisePenalty = Math.max(0, (30 - exerciseMinutes) / 60);
-    const moodPenalty = (5 - moodLevel) / 4;
+    // Predict stress level using linear regression model
+    const predictedStressLevel = predictStressLevel(
+      sleepHours || 7,
+      screenTimeHours || 6,
+      exerciseMinutes || 30,
+      waterIntakeLiters || 2.5,
+      meditationMinutes || 0
+    );
 
-    // Weighted sum
-    const raw =
-      0.30 * sleepPenalty +
-      0.25 * stressPenalty +
-      0.20 * screenPenalty +
-      0.15 * exercisePenalty +
-      0.10 * moodPenalty;
+    // Convert predicted stress (0-10) to biological impact score (0-100)
+    // Higher stress = lower biological health score
+    // Invert: stress 0 = score 100, stress 10 = score 0
+    const score = Math.max(0, Math.min(100, Math.round(100 - (predictedStressLevel * 10))));
 
-    // Convert to 0-100
-    const score = Math.max(0, Math.min(100, Math.round(raw * 100)));
-
-    // Category
+    // Category based on predicted stress level
     let category;
-    if (score <= 33) {
-      category = 'Low';
-    } else if (score >= 34 && score <= 66) {
+    if (predictedStressLevel <= 3.3) {
+      category = 'High'; // Low stress = High biological health
+    } else if (predictedStressLevel >= 3.4 && predictedStressLevel <= 6.6) {
       category = 'Moderate';
     } else {
-      category = 'High';
+      category = 'Low'; // High stress = Low biological health
     }
 
-    // Generate message
+    // Generate message based on predicted stress and factors
     let message = '';
     if (category === 'High') {
-      if (sleepPenalty < 0.25 && stressPenalty < 0.5 && screenPenalty < 0.5) {
-        message = 'Your biological impact score reflects excellent lifestyle balance. Your sleep patterns are optimal, stress levels are well-managed, and screen time is within healthy limits. Continue maintaining these positive habits for sustained wellness.';
-      } else if (sleepPenalty >= 0.5) {
-        message = 'Your biological impact score is high, but sleep quality needs attention. While your stress management and lifestyle choices are contributing positively, improving sleep duration and consistency will further enhance your overall biological health.';
-      } else if (stressPenalty >= 0.75) {
-        message = 'Your biological impact score is high, though stress management could be improved. Your sleep and lifestyle habits are solid, but reducing stress through mindfulness or relaxation techniques would optimize your biological wellness.';
+      if (sleepHours >= 7 && sleepHours <= 9 && predictedStressLevel <= 3) {
+        message = 'Your biological impact score reflects excellent lifestyle balance. Your sleep patterns are optimal, predicted stress levels are low, and your lifestyle factors support good wellness. Continue maintaining these positive habits for sustained wellness.';
+      } else if (sleepHours < 7) {
+        message = 'Your biological impact score is high, but sleep quality needs attention. While your predicted stress level is manageable, improving sleep duration to 7-9 hours will further enhance your overall biological health.';
       } else {
-        message = 'Your biological impact score is high, indicating strong overall wellness. Your sleep and stress management are on track, and your lifestyle choices support good biological health. Keep up the excellent work!';
+        message = 'Your biological impact score is high, indicating strong overall wellness. Your predicted stress level is low, and your lifestyle choices support good biological health. Keep up the excellent work!';
       }
     } else if (category === 'Moderate') {
-      if (sleepPenalty >= 0.5 && stressPenalty >= 0.5) {
-        message = 'Your biological impact score is moderate, with both sleep and stress areas needing improvement. Focus on establishing a consistent sleep schedule of 7-9 hours and implementing stress-reduction strategies. These changes will significantly improve your biological wellness.';
-      } else if (sleepPenalty >= 0.5) {
-        message = 'Your biological impact score is moderate, primarily due to sleep patterns that deviate from the optimal 8-hour range. Your stress management and lifestyle choices are reasonable, but improving sleep quality and duration would boost your biological health.';
-      } else if (stressPenalty >= 0.5) {
-        message = 'Your biological impact score is moderate, with elevated stress levels being a key factor. Your sleep patterns are decent, but implementing stress management techniques such as meditation, exercise, or time management would improve your overall biological wellness.';
-      } else if (screenPenalty >= 0.5 || exercisePenalty >= 0.5) {
-        message = 'Your biological impact score is moderate, with lifestyle factors like screen time or exercise levels affecting your wellness. Your sleep and stress management are adequate, but balancing screen usage and increasing physical activity would enhance your biological health.';
+      if (sleepHours < 7 && predictedStressLevel >= 5) {
+        message = 'Your biological impact score is moderate, with both sleep and predicted stress levels needing improvement. Focus on establishing a consistent sleep schedule of 7-9 hours and implementing stress-reduction strategies. These changes will significantly improve your biological wellness.';
+      } else if (sleepHours < 7) {
+        message = 'Your biological impact score is moderate, primarily due to sleep patterns that deviate from the optimal 7-9 hour range. Your predicted stress level is manageable, but improving sleep quality and duration would boost your biological health.';
+      } else if (predictedStressLevel >= 5) {
+        message = 'Your biological impact score is moderate, with elevated predicted stress levels being a key factor. Your sleep patterns are decent, but implementing stress management techniques such as meditation, exercise, or time management would improve your overall biological wellness.';
       } else {
-        message = 'Your biological impact score is moderate, indicating a balanced but improvable wellness profile. Your sleep, stress, and lifestyle habits are within acceptable ranges, but optimizing each area would move you toward better biological health.';
+        message = 'Your biological impact score is moderate, indicating a balanced but improvable wellness profile. Your sleep and predicted stress levels are within acceptable ranges, but optimizing each area would move you toward better biological health.';
       }
     } else {
-      if (sleepPenalty >= 0.75 && stressPenalty >= 0.75) {
-        message = 'Your biological impact score is low, with both sleep and stress requiring immediate attention. Prioritize establishing a regular sleep schedule of 7-9 hours and implementing daily stress-reduction practices. These fundamental changes are crucial for improving your biological wellness.';
-      } else if (sleepPenalty >= 0.75) {
-        message = 'Your biological impact score is low, primarily due to significant sleep disruption. Aim for 7-9 hours of consistent sleep nightly, as this is foundational to biological health. While stress and lifestyle factors also need attention, sleep improvement should be your top priority.';
-      } else if (stressPenalty >= 0.75) {
-        message = 'Your biological impact score is low, with high stress levels significantly impacting your biological wellness. Implement stress management strategies immediately—consider meditation, regular exercise, or professional support. Your sleep patterns also need attention to support stress recovery.';
+      if (sleepHours < 6 && predictedStressLevel >= 7) {
+        message = 'Your biological impact score is low, with both sleep and predicted stress levels requiring immediate attention. Prioritize establishing a regular sleep schedule of 7-9 hours and implementing daily stress-reduction practices. These fundamental changes are crucial for improving your biological wellness.';
+      } else if (sleepHours < 6) {
+        message = 'Your biological impact score is low, primarily due to significant sleep disruption. Aim for 7-9 hours of consistent sleep nightly, as this is foundational to biological health. While predicted stress levels also need attention, sleep improvement should be your top priority.';
+      } else if (predictedStressLevel >= 7) {
+        message = 'Your biological impact score is low, with high predicted stress levels significantly impacting your biological wellness. Implement stress management strategies immediately—consider meditation, regular exercise, or professional support. Your sleep patterns also need attention to support stress recovery.';
       } else {
         message = 'Your biological impact score is low, indicating multiple areas need improvement. Focus on establishing healthy sleep patterns (7-9 hours), reducing stress through proven techniques, and balancing screen time with physical activity. These lifestyle changes will significantly improve your biological health.';
       }
     }
 
-    // Determine persona
+    // Determine persona based on predicted stress and factors
     let persona, personaDescription;
-    if (sleepHours < 6 && stressLevel >= 4 && screenTimeHours >= 6) {
+    if (sleepHours < 6 && predictedStressLevel >= 6 && screenTimeHours >= 6) {
       persona = '🔥 Wired Night Owl';
-      personaDescription = 'Low sleep combined with high stress and high screen time suggests disrupted recovery patterns.';
-    } else if (exerciseMinutes < 15 && moodLevel <= 2) {
+      personaDescription = 'Low sleep combined with high predicted stress and high screen time suggests disrupted recovery patterns.';
+    } else if (exerciseMinutes < 15 && predictedStressLevel >= 6) {
       persona = '📉 Flat-Lined & Exhausted';
-      personaDescription = 'Low movement and low mood indicate depleted energy and reduced resilience.';
-    } else if (screenTimeHours > 8 && stressLevel >= 3) {
+      personaDescription = 'Low movement and high predicted stress indicate depleted energy and reduced resilience.';
+    } else if (screenTimeHours > 8 && predictedStressLevel >= 5) {
       persona = '📱 Doomscrolling Achiever';
-      personaDescription = 'High screen time with moderate stress suggests cognitive overload and poor recovery.';
+      personaDescription = 'High screen time with moderate predicted stress suggests cognitive overload and poor recovery.';
     } else {
       persona = '🧘 Resilient Baseline';
       personaDescription = 'Your patterns show overall balanced stress and recovery.';
@@ -239,7 +287,8 @@ app.post('/api/calculate-score', async (req, res) => {
       category,
       message,
       persona,
-      personaDescription
+      personaDescription,
+      predictedStressLevel: Math.round(predictedStressLevel * 10) / 10 // Round to 1 decimal
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -249,7 +298,7 @@ app.post('/api/calculate-score', async (req, res) => {
 // Submit daily check-in
 app.post('/api/checkin', async (req, res) => {
   try {
-    const { userId = 'default', sleepHours, stressLevel, screenTimeHours, exerciseMinutes, moodLevel, score } = req.body;
+    const { userId = 'default', sleepHours, screenTimeHours, exerciseMinutes, waterIntakeLiters, meditationMinutes, score } = req.body;
     
     const data = await readData();
     let userData = await getUserData(userId);

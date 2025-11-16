@@ -147,47 +147,43 @@ function App() {
           </form>
 
           {result && (
-            <div className="mt-8 p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-200">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Your Results</h2>
-              
+            <div className="mt-8 bg-white rounded-2xl shadow-xl p-6 md:p-8">
+              {/* Large bold score and category */}
               <div className="text-center mb-6">
-                <div className="inline-block">
-                  <div className="text-5xl font-bold text-indigo-600 mb-2">{result.score}</div>
-                  <div className="text-sm text-gray-600">Biological Impact Score</div>
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
+                  Biological Impact Score: {result.score}/100 — {result.category}
+                </h2>
+                
+                {/* Horizontal progress bar */}
+                <div className="w-full bg-gray-200 rounded-full h-4 md:h-5 mb-6 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      result.category === 'Low' ? 'bg-green-500' :
+                      result.category === 'Moderate' ? 'bg-yellow-500' :
+                      'bg-red-500'
+                    }`}
+                    style={{ width: `${result.score}%` }}
+                  />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div className="bg-white p-4 rounded-lg">
-                  <div className="text-sm text-gray-600 mb-1">Category</div>
-                  <div className={`text-xl font-semibold ${
-                    result.category === 'High' ? 'text-green-600' :
-                    result.category === 'Moderate' ? 'text-yellow-600' :
-                    'text-red-600'
-                  }`}>
-                    {result.category}
-                  </div>
-                </div>
-                <div className="bg-white p-4 rounded-lg">
-                  <div className="text-sm text-gray-600 mb-1">Persona</div>
-                  <div className="text-xl font-semibold text-indigo-600">
+              {/* Message */}
+              <div className="mb-6">
+                <p className="text-gray-700 text-base md:text-lg leading-relaxed text-center">
+                  {result.message}
+                </p>
+              </div>
+
+              {/* Persona section */}
+              <div className="border-t border-gray-200 pt-6">
+                <div className="text-center mb-3">
+                  <div className="text-2xl md:text-3xl font-bold text-indigo-600 mb-2">
                     {result.persona}
                   </div>
                 </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-lg mb-4">
-                <div className="text-sm text-gray-600 mb-2">Persona Description</div>
-                <div className="text-gray-800 leading-relaxed">
+                <p className="text-gray-600 text-sm md:text-base leading-relaxed text-center">
                   {result.personaDescription}
-                </div>
-              </div>
-
-              <div className="bg-white p-4 rounded-lg">
-                <div className="text-sm text-gray-600 mb-2">Message</div>
-                <div className="text-gray-800 leading-relaxed">
-                  {result.message}
-                </div>
+                </p>
               </div>
             </div>
           )}

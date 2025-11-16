@@ -39,19 +39,19 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 flex flex-col items-center justify-center p-4 py-8 relative">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 py-8 relative overflow-x-hidden">
       {/* Header */}
-      <div className="w-full max-w-3xl mx-auto mb-6 text-center animate-fade-in-up">
-        <h1 className="text-3xl md:text-4xl font-bold text-slate-800 tracking-tight mb-2">
+      <div className="w-full max-w-3xl mx-auto mb-8 text-center animate-fade-in-up">
+        <h1 className="text-4xl md:text-5xl font-bold text-slate-800 tracking-tight mb-3 bg-gradient-to-r from-slate-800 via-blue-800 to-cyan-800 bg-clip-text text-transparent">
           MindGene OS
         </h1>
-        <p className="text-base md:text-lg text-slate-600 font-normal">
+        <p className="text-lg md:text-xl text-slate-600 font-normal max-w-2xl mx-auto">
           See how your habits shape your biology.
         </p>
       </div>
 
       <div className="w-full max-w-3xl mx-auto relative z-10">
-        <div className="bg-white rounded-2xl shadow-lg drop-shadow-xl p-8 md:p-12 animate-fade-in-up">
+        <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 md:p-12 animate-fade-in-up card-hover border border-slate-100/50">
           <div className="text-center mb-12">
             <h2 className="text-2xl md:text-3xl font-semibold mb-3 text-slate-700 tracking-tight">
               Daily Check-In
@@ -59,12 +59,12 @@ function App() {
             <div className="mt-4 w-20 h-1 bg-gradient-to-r from-blue-200 via-cyan-200 to-teal-200 mx-auto rounded-full"></div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-7">
+          <form onSubmit={handleSubmit} className="space-y-8">
             {/* Sleep Hours */}
             <div className="animate-slide-in" style={{ animationDelay: '0.1s' }}>
-              <label htmlFor="sleepHours" className="block text-base font-medium text-slate-700 mb-3 flex items-center gap-2">
-                <span className="text-lg">😴</span>
-                Sleep Hours
+              <label htmlFor="sleepHours" className="block text-base font-semibold text-slate-700 mb-3 flex items-center gap-3">
+                <span className="text-2xl">😴</span>
+                <span>Sleep Hours</span>
               </label>
               <input
                 id="sleepHours"
@@ -74,22 +74,22 @@ function App() {
                 step="0.5"
                 value={formData.sleepHours}
                 onChange={(e) => handleChange('sleepHours', parseFloat(e.target.value) || 0)}
-                className="w-full px-5 py-4 text-base border-2 border-slate-200 rounded-xl focus:ring-3 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all duration-200 bg-slate-50 hover:bg-white hover:border-slate-300 shadow-sm"
+                className="w-full px-6 py-4 text-base border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-200/50 focus:border-blue-400 outline-none bg-slate-50/80 hover:bg-white hover:border-slate-300 shadow-sm hover:shadow-md"
                 required
               />
             </div>
 
             {/* Stress Level */}
             <div className="animate-slide-in" style={{ animationDelay: '0.2s' }}>
-              <label htmlFor="stressLevel" className="block text-base font-medium text-slate-700 mb-3 flex items-center gap-2">
-                <span className="text-lg">😰</span>
-                Stress Level
+              <label htmlFor="stressLevel" className="block text-base font-semibold text-slate-700 mb-3 flex items-center gap-3">
+                <span className="text-2xl">😰</span>
+                <span>Stress Level</span>
               </label>
               <select
                 id="stressLevel"
                 value={formData.stressLevel}
                 onChange={(e) => handleChange('stressLevel', parseInt(e.target.value))}
-                className="w-full px-5 py-4 text-base border-2 border-slate-200 rounded-xl focus:ring-3 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all duration-200 bg-slate-50 hover:bg-white hover:border-slate-300 cursor-pointer shadow-sm"
+                className="w-full px-6 py-4 text-base border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-200/50 focus:border-blue-400 outline-none bg-slate-50/80 hover:bg-white hover:border-slate-300 cursor-pointer shadow-sm hover:shadow-md"
                 required
               >
                 <option value={1}>1 - Very Low</option>
@@ -102,9 +102,9 @@ function App() {
 
             {/* Screen Time */}
             <div className="animate-slide-in" style={{ animationDelay: '0.3s' }}>
-              <label htmlFor="screenTimeHours" className="block text-base font-medium text-slate-700 mb-3 flex items-center gap-2">
-                <span className="text-lg">📱</span>
-                Screen Time Hours
+              <label htmlFor="screenTimeHours" className="block text-base font-semibold text-slate-700 mb-3 flex items-center gap-3">
+                <span className="text-2xl">📱</span>
+                <span>Screen Time Hours</span>
               </label>
               <input
                 id="screenTimeHours"
@@ -114,16 +114,16 @@ function App() {
                 step="0.5"
                 value={formData.screenTimeHours}
                 onChange={(e) => handleChange('screenTimeHours', parseFloat(e.target.value) || 0)}
-                className="w-full px-5 py-4 text-base border-2 border-slate-200 rounded-xl focus:ring-3 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all duration-200 bg-slate-50 hover:bg-white hover:border-slate-300 shadow-sm"
+                className="w-full px-6 py-4 text-base border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-200/50 focus:border-blue-400 outline-none bg-slate-50/80 hover:bg-white hover:border-slate-300 shadow-sm hover:shadow-md"
                 required
               />
             </div>
 
             {/* Exercise Minutes */}
             <div className="animate-slide-in" style={{ animationDelay: '0.4s' }}>
-              <label htmlFor="exerciseMinutes" className="block text-base font-medium text-slate-700 mb-3 flex items-center gap-2">
-                <span className="text-lg">💪</span>
-                Exercise Minutes
+              <label htmlFor="exerciseMinutes" className="block text-base font-semibold text-slate-700 mb-3 flex items-center gap-3">
+                <span className="text-2xl">💪</span>
+                <span>Exercise Minutes</span>
               </label>
               <input
                 id="exerciseMinutes"
@@ -133,22 +133,22 @@ function App() {
                 step="1"
                 value={formData.exerciseMinutes}
                 onChange={(e) => handleChange('exerciseMinutes', parseInt(e.target.value) || 0)}
-                className="w-full px-5 py-4 text-base border-2 border-slate-200 rounded-xl focus:ring-3 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all duration-200 bg-slate-50 hover:bg-white hover:border-slate-300 shadow-sm"
+                className="w-full px-6 py-4 text-base border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-200/50 focus:border-blue-400 outline-none bg-slate-50/80 hover:bg-white hover:border-slate-300 shadow-sm hover:shadow-md"
                 required
               />
             </div>
 
             {/* Mood Level */}
             <div className="animate-slide-in" style={{ animationDelay: '0.5s' }}>
-              <label htmlFor="moodLevel" className="block text-base font-medium text-slate-700 mb-3 flex items-center gap-2">
-                <span className="text-lg">😊</span>
-                Mood Level
+              <label htmlFor="moodLevel" className="block text-base font-semibold text-slate-700 mb-3 flex items-center gap-3">
+                <span className="text-2xl">😊</span>
+                <span>Mood Level</span>
               </label>
               <select
                 id="moodLevel"
                 value={formData.moodLevel}
                 onChange={(e) => handleChange('moodLevel', parseInt(e.target.value))}
-                className="w-full px-5 py-4 text-base border-2 border-slate-200 rounded-xl focus:ring-3 focus:ring-blue-200 focus:border-blue-400 outline-none transition-all duration-200 bg-slate-50 hover:bg-white hover:border-slate-300 cursor-pointer shadow-sm"
+                className="w-full px-6 py-4 text-base border-2 border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-200/50 focus:border-blue-400 outline-none bg-slate-50/80 hover:bg-white hover:border-slate-300 cursor-pointer shadow-sm hover:shadow-md"
                 required
               >
                 <option value={1}>1 - Very Low</option>
@@ -161,18 +161,18 @@ function App() {
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold text-lg py-5 px-8 rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 shadow-md hover:shadow-xl transform hover:-translate-y-0.5 active:translate-y-0 relative overflow-hidden group mt-10"
+              className="w-full bg-gradient-to-r from-blue-500 via-blue-600 to-cyan-500 text-white font-bold text-lg py-5 px-8 rounded-xl hover:from-blue-600 hover:via-blue-700 hover:to-cyan-600 transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 active:translate-y-0 relative overflow-hidden group mt-10"
             >
-              <span className="relative z-10 flex items-center justify-center gap-2">
+              <span className="relative z-10 flex items-center justify-center gap-3">
                 <span>Analyze My Biology</span>
-                <span className="group-hover:translate-x-1 transition-transform duration-300">→</span>
+                <span className="group-hover:translate-x-2 transition-transform duration-300 text-xl">→</span>
               </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-blue-700 to-cyan-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </button>
           </form>
 
           {result && (
-            <div className="mt-10 bg-white rounded-2xl shadow-lg drop-shadow-xl p-8 md:p-10 border border-slate-100 animate-fade-in-up">
+            <div className="mt-10 bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 md:p-10 border border-slate-100/50 animate-fade-in-up card-hover">
               {/* Large bold score and category */}
               <div className="text-center mb-8">
                 <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-3 tracking-tight">

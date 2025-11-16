@@ -18,6 +18,7 @@ function App() {
     moodLevel: 3
   })
   const [result, setResult] = useState<Result | null>(null)
+  const [simulatedSleepHours, setSimulatedSleepHours] = useState<number>(8)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,6 +30,8 @@ function App() {
       formData.moodLevel
     )
     setResult(calculatedResult)
+    // Set simulation slider to current sleep hours
+    setSimulatedSleepHours(formData.sleepHours)
   }
 
   const handleChange = (field: keyof FormData, value: number) => {
@@ -211,6 +214,81 @@ function App() {
                 <p className="text-gray-600 text-sm md:text-base leading-relaxed text-center font-medium">
                   {result.personaDescription}
                 </p>
+              </div>
+
+              {/* What If Simulation */}
+              <div className="border-t-2 border-indigo-200 pt-8 mt-8">
+                <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center">
+                  What If Simulation
+                </h3>
+                
+                <div className="mb-6">
+                  <label htmlFor="simulatedSleepHours" className="block text-sm font-semibold text-gray-700 mb-3 text-center">
+                    What if I change my sleep hours?
+                  </label>
+                  <div className="flex items-center gap-4 mb-2">
+                    <span className="text-sm text-gray-600 font-medium w-12">3h</span>
+                    <input
+                      id="simulatedSleepHours"
+                      type="range"
+                      min="3"
+                      max="10"
+                      step="0.5"
+                      value={simulatedSleepHours}
+                      onChange={(e) => setSimulatedSleepHours(parseFloat(e.target.value))}
+                      className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                    />
+                    <span className="text-sm text-gray-600 font-medium w-12 text-right">10h</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-lg font-bold text-indigo-600">{simulatedSleepHours} hours</span>
+                  </div>
+                </div>
+
+                {(() => {
+                  const simulatedResult = calculateImpactScore(
+                    simulatedSleepHours,
+                    formData.stressLevel,
+                    formData.screenTimeHours,
+                    formData.exerciseMinutes,
+                    formData.moodLevel
+                  )
+                  
+                  return (
+                    <div className="bg-gradient-to-br from-purple-50/50 to-pink-50/50 rounded-2xl p-6 border border-purple-100">
+                      {/* Current vs Simulated Score */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div className="bg-white rounded-xl p-4 shadow-md">
+                          <div className="text-sm text-gray-600 mb-1">Current Score</div>
+                          <div className="text-3xl font-bold text-gray-800">{result.score}</div>
+                          <div className="text-xs text-gray-500 mt-1">({formData.sleepHours}h sleep)</div>
+                        </div>
+                        <div className="bg-white rounded-xl p-4 shadow-md">
+                          <div className="text-sm text-gray-600 mb-1">Simulated Score</div>
+                          <div className={`text-3xl font-bold ${
+                            simulatedResult.score > result.score ? 'text-red-600' :
+                            simulatedResult.score < result.score ? 'text-green-600' :
+                            'text-gray-800'
+                          }`}>
+                            {simulatedResult.score}
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">({simulatedSleepHours}h sleep)</div>
+                        </div>
+                      </div>
+
+                      {/* Change message */}
+                      <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 text-center">
+                        <p className="text-gray-700 text-sm md:text-base leading-relaxed">
+                          If you slept <span className="font-bold text-indigo-600">{simulatedSleepHours} hours</span> tonight, your score would change from <span className="font-bold">{result.score}</span> to <span className={`font-bold ${
+                            simulatedResult.score > result.score ? 'text-red-600' :
+                            simulatedResult.score < result.score ? 'text-green-600' :
+                            'text-gray-800'
+                          }`}>{simulatedResult.score}</span>.
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           )}

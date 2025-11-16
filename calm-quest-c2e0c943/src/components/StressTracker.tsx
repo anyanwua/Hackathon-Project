@@ -49,6 +49,57 @@ export const StressTracker = () => {
 
   const xpProgress = userData ? (userData.xp / userData.xpToNextLevel) * 100 : 0;
 
+  // Generate insight summary based on stress level and recommendations
+  const generateInsightSummary = (stressLevel: number, recommendations: Recommendation[]): string => {
+    let summary = '';
+    
+    // Determine stress category
+    if (stressLevel >= 70) {
+      summary = `Your stress level is very high (${Math.round(stressLevel)}%). `;
+      if (recommendations.length > 0) {
+        const highPriorityRecs = recommendations.filter(r => r.priority === 'high');
+        if (highPriorityRecs.length > 0) {
+          summary += `Focus on addressing ${highPriorityRecs.length === 1 ? 'the critical issue' : 'these critical issues'}: `;
+          summary += highPriorityRecs.slice(0, 2).map(r => r.title.replace(/🚨|⚠️|Critical: /g, '').trim()).join(' and ');
+          if (highPriorityRecs.length > 2) {
+            summary += `, plus ${highPriorityRecs.length - 2} more critical ${highPriorityRecs.length - 2 === 1 ? 'area' : 'areas'}`;
+          }
+          summary += '.';
+        } else {
+          summary += `Address the ${recommendations.length === 1 ? 'recommendation' : `${recommendations.length} recommendations`} below to improve your wellness.`;
+        }
+      } else {
+        summary += 'Consider making lifestyle adjustments to reduce stress.';
+      }
+    } else if (stressLevel >= 40) {
+      summary = `Your stress level is moderate (${Math.round(stressLevel)}%). `;
+      if (recommendations.length > 0) {
+        summary += `You have ${recommendations.length} ${recommendations.length === 1 ? 'area' : 'areas'} to focus on: `;
+        summary += recommendations.slice(0, 3).map(r => r.title.replace(/🚨|⚠️|Critical: /g, '').trim()).join(', ');
+        if (recommendations.length > 3) {
+          summary += `, and ${recommendations.length - 3} more`;
+        }
+        summary += '.';
+      } else {
+        summary += 'You\'re on the right track. Continue maintaining healthy habits.';
+      }
+    } else {
+      summary = `Your stress level is low (${Math.round(stressLevel)}%). `;
+      if (recommendations.length > 0) {
+        summary += `You have ${recommendations.length} minor ${recommendations.length === 1 ? 'improvement' : 'improvements'} to consider: `;
+        summary += recommendations.slice(0, 2).map(r => r.title.replace(/🚨|⚠️|Critical: /g, '').trim()).join(' and ');
+        if (recommendations.length > 2) {
+          summary += `, plus ${recommendations.length - 2} more`;
+        }
+        summary += '.';
+      } else {
+        summary += 'Excellent! Your lifestyle habits are well-balanced. Keep up the great work!';
+      }
+    }
+    
+    return summary;
+  };
+
   const getStressColor = (level: number): string => {
     if (level < 30) return "success";
     if (level < 60) return "accent";
@@ -70,13 +121,6 @@ export const StressTracker = () => {
       setScoreResult(score);
       setIsCalculated(true);
       
-      // Filter out already completed recommendations
-      const completedIds = userData?.completedRecommendations || [];
-      const availableRecommendations = (score.recommendations || []).filter(
-        (rec) => !completedIds.includes(rec.id)
-      );
-      setRecommendations(availableRecommendations);
-      
       // Submit check-in
       const checkinResponse = await submitCheckin(
         'default',
@@ -90,6 +134,18 @@ export const StressTracker = () => {
       
       // Update user data
       setUserData(checkinResponse.userData);
+      
+      // Filter out already completed recommendations after getting updated user data
+      const completedIds = checkinResponse.userData.completedRecommendations || [];
+      const availableRecommendations = (score.recommendations || []).filter(
+        (rec) => !completedIds.includes(rec.id)
+      );
+      setRecommendations(availableRecommendations);
+      
+      // Debug: Log recommendations for troubleshooting
+      console.log('Score recommendations:', score.recommendations?.length || 0);
+      console.log('Completed IDs:', completedIds);
+      console.log('Available recommendations:', availableRecommendations.length);
       
       // Show XP gains
       checkinResponse.xpGains.forEach((gain, index) => {
@@ -125,7 +181,7 @@ export const StressTracker = () => {
       }
       
       toast.success("Check-in submitted!", {
-        description: `Biological Impact Score: ${score.score}/100 - ${score.category}`,
+        description: `Your wellness analysis is complete!`,
       });
     } catch (error) {
       console.error('Failed to submit check-in:', error);
@@ -139,12 +195,18 @@ export const StressTracker = () => {
     setFactors(prev => ({ ...prev, [key]: value[0] }));
     setIsCalculated(false);
     setScoreResult(null);
+    setRecommendations([]); // Clear recommendations when inputs change
   };
 
   // Calculate stress level from score
-  // Score = 100 - (predictedStressLevel * 10), so stressLevel = 100 - score
-  // This is more reliable than using predictedStressLevel directly
-  const stressLevel = scoreResult ? 100 - scoreResult.score : 0;
+  // In the new penalty-based system: score = penalty (0-100, higher = worse)
+  // For stress visualization, we'll use the predicted stress level if available,
+  // otherwise derive from score (higher penalty score = higher stress)
+  const stressLevel = scoreResult?.predictedStressLevel !== undefined
+    ? scoreResult.predictedStressLevel * 10  // Convert 0-10 to 0-100%
+    : scoreResult
+      ? scoreResult.score  // Use penalty score directly as stress indicator
+      : 0;
 
   if (!userData) {
     return (
@@ -208,9 +270,9 @@ export const StressTracker = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingDown className="h-5 w-5 text-primary" />
-              Biological Impact Analysis
+              Stress Analysis
             </CardTitle>
-            <CardDescription>Your wellness score and insights</CardDescription>
+            <CardDescription>Your stress level and insights</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex flex-col items-center py-4">
@@ -227,24 +289,6 @@ export const StressTracker = () => {
             </div>
             
             <div className="space-y-4">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-foreground mb-2">
-                  Score: {scoreResult.score}/100
-                </p>
-                <p className={`text-lg font-semibold ${
-                  scoreResult.category === 'High' ? 'text-success' :
-                  scoreResult.category === 'Moderate' ? 'text-accent' :
-                  'text-destructive'
-                }`}>
-                  {scoreResult.category} Impact
-                </p>
-                {scoreResult.predictedStressLevel !== undefined && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Predicted Stress Level: {scoreResult.predictedStressLevel}/10
-                  </p>
-                )}
-              </div>
-              
               <div className="p-4 rounded-lg bg-secondary/50 border border-border/30">
                 <p className="text-sm text-muted-foreground mb-2">Your Persona:</p>
                 <p className="font-semibold text-foreground mb-2">{scoreResult.persona}</p>
@@ -253,22 +297,46 @@ export const StressTracker = () => {
               
               <div className="p-4 rounded-lg bg-secondary/50 border border-border/30">
                 <p className="text-sm text-muted-foreground mb-2">Insights:</p>
-                <p className="text-sm text-foreground">{scoreResult.message}</p>
+                <p className="text-sm text-foreground">
+                  {isCalculated && scoreResult 
+                    ? generateInsightSummary(stressLevel, recommendations)
+                    : scoreResult?.message || 'Complete your check-in to see personalized insights.'}
+                </p>
               </div>
               
-              {/* Recommendations */}
-              {recommendations.length > 0 && (
+              {/* Recommendations - Only show after user submits data */}
+              {isCalculated && (
                 <div className="p-4 rounded-lg bg-secondary/50 border border-border/30">
                   <p className="text-sm font-semibold text-foreground mb-3">Recommended Tasks:</p>
-                  <div className="space-y-2">
-                    {recommendations.map((rec) => (
+                  {recommendations.length > 0 ? (
+                    <div className="space-y-2">
+                      {recommendations.map((rec) => (
                       <div
                         key={rec.id}
-                        className="flex items-start justify-between p-3 rounded-lg bg-background/50 border border-border/20 hover:bg-background/70 transition-colors"
+                        className={`flex items-start justify-between p-3 rounded-lg border transition-colors ${
+                          rec.priority === 'high'
+                            ? 'bg-destructive/10 border-destructive/30 hover:bg-destructive/15'
+                            : rec.priority === 'medium'
+                            ? 'bg-accent/10 border-accent/30 hover:bg-accent/15'
+                            : 'bg-background/50 border-border/20 hover:bg-background/70'
+                        }`}
                       >
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <p className="text-sm font-semibold text-foreground">{rec.title}</p>
+                            {rec.priority && (
+                              <span
+                                className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                  rec.priority === 'high'
+                                    ? 'bg-destructive/20 text-destructive'
+                                    : rec.priority === 'medium'
+                                    ? 'bg-accent/20 text-accent'
+                                    : 'bg-muted text-muted-foreground'
+                                }`}
+                              >
+                                {rec.priority === 'high' ? 'High Priority' : rec.priority === 'medium' ? 'Medium Priority' : 'Low Priority'}
+                              </span>
+                            )}
                             <span className="text-xs font-medium text-accent bg-accent/10 px-2 py-0.5 rounded">
                               +{rec.xp} XP
                             </span>
@@ -282,7 +350,8 @@ export const StressTracker = () => {
                             try {
                               const result = await completeRecommendation('default', rec.id);
                               setUserData(result.userData);
-                              setRecommendations(recommendations.filter((r) => r.id !== rec.id));
+                              // Remove the completed recommendation from the list
+                              setRecommendations(prev => prev.filter((r) => r.id !== rec.id));
                               toast.success(`+${result.xpGain.amount} XP - ${result.xpGain.reason}`);
                               if (result.levelUp) {
                                 toast.success(`Level Up! You're now level ${result.levelUp}`);
@@ -297,7 +366,14 @@ export const StressTracker = () => {
                         </Button>
                       </div>
                     ))}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-muted-foreground">
+                        🎉 Great job! All your metrics are in the optimal range. Keep up the excellent work!
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -306,6 +382,7 @@ export const StressTracker = () => {
               onClick={() => {
                 setIsCalculated(false);
                 setScoreResult(null);
+                setRecommendations([]);
               }}
               variant="outline"
               className="w-full"

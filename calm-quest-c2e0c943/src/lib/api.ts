@@ -18,6 +18,7 @@ export interface Recommendation {
   title: string;
   description: string;
   xp: number;
+  priority?: 'high' | 'medium' | 'low';
 }
 
 export interface ScoreResult {

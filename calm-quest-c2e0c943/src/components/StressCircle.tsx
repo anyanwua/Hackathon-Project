@@ -38,6 +38,11 @@ export const StressCircle = ({ factors, stressLevel }: StressCircleProps) => {
     }
     if (key === 'screen' && factors.screenTimeHours !== undefined) {
       // Lower screen time is better (ideal <= 4h)
+      // If 4 hours or less, return 100 (perfect)
+      if (factors.screenTimeHours <= 4) {
+        return 100;
+      }
+      // For values > 4 hours, scale down from 100
       return Math.max(0, ((10 - (factors.screenTimeHours - 4)) / 10) * 100);
     }
     if (key === 'exercise' && factors.exerciseMinutes !== undefined) {
@@ -73,6 +78,23 @@ export const StressCircle = ({ factors, stressLevel }: StressCircleProps) => {
     return 0;
   };
 
+  // Get distinct color for each factor
+  const getFactorColor = (factorKey: string): string => {
+    const colorMap: Record<string, string> = {
+      'sleep': '#6366f1',      // Indigo
+      'screen': '#f59e0b',     // Amber/Orange
+      'exercise': '#10b981',   // Green
+      'water': '#06b6d4',      // Cyan
+      'meditation': '#ec4899', // Pink/Magenta
+      // Legacy support
+      'workload': '#ef4444',   // Red
+      'social': '#3b82f6',     // Blue
+      'nutrition': '#f97316',  // Orange
+    };
+    return colorMap[factorKey] || 'hsl(var(--muted))';
+  };
+
+  // Keep score-based color for opacity/brightness variation if needed
   const getColor = (score: number): string => {
     if (score >= 70) return 'hsl(var(--success))';
     if (score >= 40) return 'hsl(var(--accent))';
@@ -84,7 +106,7 @@ export const StressCircle = ({ factors, stressLevel }: StressCircleProps) => {
   
   const rings = useNewMetrics ? [
     { key: 'sleep', label: 'Sleep', radius: 140 },
-    { key: 'screen', label: 'Screen', radius: 115 },
+    { key: 'screen', label: 'Screentime', radius: 115 },
     { key: 'exercise', label: 'Exercise', radius: 90 },
     { key: 'water', label: 'Water', radius: 65 },
     { key: 'meditation', label: 'Meditation', radius: 40 },
@@ -104,61 +126,63 @@ export const StressCircle = ({ factors, stressLevel }: StressCircleProps) => {
 
   return (
     <div className="flex flex-col items-center gap-6">
-      <div 
-        className={`relative w-80 h-80 flex items-center justify-center transition-all duration-700 ${
-          stage >= 1 ? 'scale-100' : 'scale-125'
-        }`}
-        style={{
-          transform: stage >= 1 ? 'translateX(0)' : 'translateX(0) scale(1.25)',
-        }}
-      >
-        <svg width="320" height="320" className="transform -rotate-90">
-          {rings.map((ring, index) => {
-            const score = getFactorScore(ring.key);
-            const circumference = 2 * Math.PI * ring.radius;
-            const strokeDashoffset = circumference - (score / 100) * circumference;
-            const ringDelay = (4 - index) * 150; // Inner rings animate first
-            
-            return (
-              <g key={ring.key}>
-                {/* Background circle */}
-                <circle
-                  cx="160"
-                  cy="160"
-                  r={ring.radius}
-                  fill="none"
-                  stroke="hsl(var(--muted))"
-                  strokeWidth="12"
-                  opacity={stage >= 2 ? "0.2" : "0"}
-                  className="transition-opacity duration-500"
-                  style={{
-                    transitionDelay: stage >= 2 ? `${ringDelay}ms` : '0ms'
-                  }}
-                />
-                {/* Progress circle */}
-                <circle
-                  cx="160"
-                  cy="160"
-                  r={ring.radius}
-                  fill="none"
-                  stroke={getColor(score)}
-                  strokeWidth="12"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={stage >= 2 ? strokeDashoffset : circumference}
-                  strokeLinecap="round"
-                  className="transition-all duration-700 ease-out"
-                  style={{
-                    transitionDelay: stage >= 2 ? `${ringDelay}ms` : '0ms'
-                  }}
-                />
-              </g>
-            );
-          })}
-        </svg>
+      <div className="flex items-center gap-6">
+        <div 
+          className={`relative w-80 h-80 flex items-center justify-center transition-all duration-700 ${
+            stage >= 1 ? 'scale-100' : 'scale-125'
+          }`}
+          style={{
+            transform: stage >= 1 ? 'translateX(0)' : 'translateX(0) scale(1.25)',
+          }}
+        >
+          <svg width="320" height="320" className="transform -rotate-90">
+            {rings.map((ring, index) => {
+              const score = getFactorScore(ring.key);
+              const circumference = 2 * Math.PI * ring.radius;
+              const strokeDashoffset = circumference - (score / 100) * circumference;
+              const ringDelay = (4 - index) * 150; // Inner rings animate first
+              
+              return (
+                <g key={ring.key}>
+                  {/* Background circle */}
+                  <circle
+                    cx="160"
+                    cy="160"
+                    r={ring.radius}
+                    fill="none"
+                    stroke="hsl(var(--muted))"
+                    strokeWidth="12"
+                    opacity={stage >= 2 ? "0.2" : "0"}
+                    className="transition-opacity duration-500"
+                    style={{
+                      transitionDelay: stage >= 2 ? `${ringDelay}ms` : '0ms'
+                    }}
+                  />
+                  {/* Progress circle */}
+                  <circle
+                    cx="160"
+                    cy="160"
+                    r={ring.radius}
+                    fill="none"
+                    stroke={getFactorColor(ring.key)}
+                    strokeWidth="12"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={stage >= 2 ? strokeDashoffset : circumference}
+                    strokeLinecap="round"
+                    className="transition-all duration-700 ease-out"
+                    style={{
+                      transitionDelay: stage >= 2 ? `${ringDelay}ms` : '0ms'
+                    }}
+                  />
+                </g>
+              );
+            })}
+          </svg>
+        </div>
         
-        {/* Center content */}
-        <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-500 ${
-          stage >= 1 ? 'scale-100 opacity-100' : 'scale-150 opacity-100'
+        {/* Stress Level Label - Side */}
+        <div className={`flex flex-col justify-center transition-all duration-500 ${
+          stage >= 1 ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'
         }`}>
           <p className="text-sm text-muted-foreground mb-1">Stress Level</p>
           <p className={`text-5xl font-bold ${getStressColor()}`}>
@@ -183,11 +207,10 @@ export const StressCircle = ({ factors, stressLevel }: StressCircleProps) => {
             >
               <div
                 className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: getColor(score) }}
+                style={{ backgroundColor: getFactorColor(ring.key) }}
               />
               <div className="flex-1">
                 <p className="text-xs font-medium text-foreground">{ring.label}</p>
-                <p className="text-xs text-muted-foreground">{Math.round(score)}%</p>
               </div>
             </div>
           );
